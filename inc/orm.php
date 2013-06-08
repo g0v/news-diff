@@ -56,6 +56,9 @@ abstract class ORM {
                 Config::get('db', 'default.user'),
                 Config::get('db', 'default.pass')
             );
+
+            self::$_pdo_obj->query("SET NAMES 'utf8'");
+            self::$_pdo_obj->query("SET CHARACTER_SET_CLIENT=utf8");
         }
 
         return self::$_pdo_obj;
