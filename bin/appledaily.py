@@ -8,6 +8,9 @@ process_date = lambda x: x[5:-6]
 DATE_FORMAT =  '%d %b %Y %H:%M:%S'
 
 class Handler(rss_base.RssBaseHandler):
+    # parser id
+    id = 1
+
     def fetch_text(self, link):
         return fetch_text(link)
 

@@ -14,6 +14,9 @@ class UTC8(tzinfo):
     def dst(self, dt): return timedelta(hours=8)
 
 class RssBaseHandler(object):
+    # default parser id
+    id = 0
+
     def get_articles(self, feed_url, last=None, limit=25):
         last = self._to_utc(datetime.strptime(last, DATE_FORMAT)) if last else datetime(1970, 1, 1, tzinfo=UTC())
         max_last = last

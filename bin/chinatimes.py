@@ -4,6 +4,9 @@ import re
 import rss_base
 
 class Handler(rss_base.RssBaseHandler):
+    # parser id
+    id = 3
+
     def fetch_text(self, link):
         return fetch_text(link)
 
