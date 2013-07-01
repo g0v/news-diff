@@ -97,13 +97,14 @@ class DB:
     self.connect()
     self.commit_indexor(1)
 
+    buff = self._buff_article
+    self._buff_article = []
+
     sql = "INSERT INTO `articles` " + \
       "(`indexor_id`, `url`, `pub_ts`, `title`, `meta`, `response`, `response_md5`) VALUES(" + \
         "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url_rss)s), " + \
         "%(url)s, %(pub_ts)s, %(title)s, %(meta)s, %(response)s, %(response_md5)s" + \
         ") ON DUPLICATE KEY UPDATE `updated_on` = CURRENT_TIMESTAMP"
-    buff = self._buff_article
-    self._buff_article = []
     self._cursor.executemany(sql, buff)
     self._conn.commit()
 
@@ -139,9 +140,11 @@ class DB:
       return
 
     self.connect()
-    sql = "INSERT IGNORE INTO `indexors` (`url`) VALUES(%(url)s)"
+
     buff = self._buff_indexor
     self._buff_indexor = []
+
+    sql = "INSERT IGNORE INTO `indexors` (`url`) VALUES(%(url)s)"
     self._cursor.executemany(sql, buff)
     self._conn.commit()
 
@@ -177,10 +180,13 @@ class DB:
       return
 
     self.connect()
-    sql = "INSERT IGNORE INTO `parsers` (`indexor_id`, `classname`) VALUES" + \
-      "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(indexor_url)s), %(classname)s)"
+    self.commit_indexor(1)
+
     buff = self._buff_parser
     self._buff_parser = []
+
+    sql = "INSERT IGNORE INTO `parsers` (`indexor_id`, `classname`) VALUES" + \
+      "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(indexor_url)s), %(classname)s)"
     self._cursor.executemany(sql, buff)
     self._conn.commit()
 
@@ -211,6 +217,8 @@ class DB:
 
   def flush(self):
     self.commit_fetch(1)
+    self.commit_indexor(1)
+    self.commit_parser(1)
     self.commit_article(1)
 
   def disconnect(self):
