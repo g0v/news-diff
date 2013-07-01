@@ -5,8 +5,8 @@ class Fetcher:
   def __init__(self):
     self._process_q = []
 
-  def register(self, url, callback = None):
-    self._process_q.append({'url': url, 'cb': callback})
+  def queue(self, url, callback = None, **meta):
+    self._process_q.append({'url': url, 'cb': callback, 'meta': meta})
 
   def start(self):
     output = []
@@ -14,11 +14,11 @@ class Fetcher:
     for proc in self._process_q:
       try:
         content = urllib.urlopen(proc['url']).read()
-        if (proc['cb']):
-          proc['cb'](content)
-          continue
-
         proc['content'] = content
+
+        if (proc['cb']):
+          proc['cb'](proc)
+          continue
 
       except IOError:
         proc['result'] = 'error'
