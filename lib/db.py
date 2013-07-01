@@ -68,7 +68,6 @@ class DB:
       buff += rows
 
     self._cached_articles = buff
-    print(self._cached_articles)
 
   def save_article(self, _payload):
     from md5 import md5
@@ -166,7 +165,7 @@ class DB:
         break
 
       buff += rows
-    self._cached_indexor_urls = map(lambda x: x[0], buff)
+    self._cached_parser_classnames = map(lambda x: x[0], buff)
 
   def save_parser(self, indexor_url, classname):
     if (classname not in self._cached_parser_classnames):

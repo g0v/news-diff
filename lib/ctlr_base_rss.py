@@ -18,8 +18,8 @@ class Ctlr_base_RSS (Ctlr_base):
   # Configs
   # ==============================
 
-  # RSS URL
-  _rss_url = ''
+  # RSS URL list
+  _rss_urls = []
 
   # file format
   _format_src = 'xml'
@@ -69,7 +69,8 @@ class Ctlr_base_RSS (Ctlr_base):
   def run(self):
     from . import Fetcher
     f = Fetcher()
-    f.queue(self._rss_url, self.dispatch_cb(self._format_src))
+    for rss_url in self._rss_urls:
+      f.queue(rss_url, self.dispatch_cb(self._format_src))
     f.start()
 
   # ==============================
