@@ -4,6 +4,13 @@ from MySQLdb.cursors import SSCursor
 
 class DB:
   """資料庫存取 singleton"""
+
+  # 當待寫入 row 到達 _min_row 時才寫入
+  min_buffered_rows = 50
+
+  # 測試模式，禁止寫入 DB
+  ignore_db_write = False
+
   # ==============================
   # Singleton-related
   # ==============================
@@ -42,14 +49,17 @@ class DB:
     self.commit_fetch()
 
   def commit_fetch(self, force_commit = 0):
-    # consider do it later
-    if (0 and not force_commit):
+    if (self.ignore_db_write):
       return
+
+    if (not force_commit and len(self._buff_fetch) >= self.min_buffered_rows):
+      return
+
+    buff = self._buff_fetch
+    self._buff_fetch = []
 
     self.connect()
     sql = "INSERT INTO `fetches` (`url`, `response`) VALUES(%(url)s, %(response)s)"
-    buff = self._buff_fetch
-    self._buff_fetch = []
     self._cursor.executemany(sql, buff)
     self._conn.commit()
 
@@ -67,7 +77,7 @@ class DB:
         break
       buff += rows
 
-    self._cached_articles = buff
+    self._cache_articles = buff
 
   def save_article(self, _payload):
     from md5 import md5
@@ -83,32 +93,34 @@ class DB:
 
     self.save_indexor(payload['url_rss'])
 
-    if ((payload["response_md5"], payload["url"]) not in self._cached_articles):
+    if ((payload["response_md5"], payload["url"]) not in self._cache_articles):
       self._buff_article.append(payload)
 
     self.commit_article()
 
   def commit_article(self, force_commit = 0):
-    # consider do it later
-    if (0 and not force_commit):
+    self.commit_indexor(1)
+
+    if (self.ignore_db_write):
       return
 
-    self.connect()
-    self.commit_indexor(1)
+    if (not force_commit and len(self._buff_article) >= self.min_buffered_rows):
+      return
 
     buff = self._buff_article
     self._buff_article = []
 
-    sql = "INSERT INTO `articles` " + \
+    self.connect()
+    sql = "INSERT IGNORE INTO `articles` " + \
       "(`indexor_id`, `url`, `pub_ts`, `title`, `meta`, `response`, `response_md5`) VALUES(" + \
         "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url_rss)s), " + \
         "%(url)s, %(pub_ts)s, %(title)s, %(meta)s, %(response)s, %(response_md5)s" + \
-        ") ON DUPLICATE KEY UPDATE `updated_on` = CURRENT_TIMESTAMP"
+        ")"
     self._cursor.executemany(sql, buff)
     self._conn.commit()
 
-    self._cached_articles = list(set(
-      self._cached_articles +
+    self._cache_articles = list(set(
+      self._cache_articles +
       map(lambda x: (x['response_md5'], x['url']), buff)))
   #
   # Indexor
@@ -125,30 +137,31 @@ class DB:
 
       buff += rows
 
-    self._cached_indexor_urls = map(lambda x: x[0], buff)
+    self._cache_indexor_urls = map(lambda x: x[0], buff)
 
   def save_indexor(self, url):
-    if (url not in self._cached_indexor_urls):
+    if (url not in self._cache_indexor_urls):
       self._buff_indexor.append({"url": url})
 
     self.commit_indexor()
 
   def commit_indexor(self, force_commit = 0):
-    # consider do it later
-    if (0 and not force_commit):
+    if (self.ignore_db_write):
       return
 
-    self.connect()
+    if (not force_commit and len(self._buff_indexor) >= self.min_buffered_rows):
+      return
 
     buff = self._buff_indexor
     self._buff_indexor = []
 
+    self.connect()
     sql = "INSERT IGNORE INTO `indexors` (`url`) VALUES(%(url)s)"
     self._cursor.executemany(sql, buff)
     self._conn.commit()
 
-    self._cached_indexor_urls = list(set(
-      self._cached_indexor_urls +
+    self._cache_indexor_urls = list(set(
+      self._cache_indexor_urls +
       map(lambda x: x['url'], buff)))
 
   #
@@ -165,32 +178,34 @@ class DB:
         break
 
       buff += rows
-    self._cached_parser_classnames = map(lambda x: x[0], buff)
+    self._cache_parser_classnames = map(lambda x: x[0], buff)
 
   def save_parser(self, indexor_url, classname):
-    if (classname not in self._cached_parser_classnames):
+    if (classname not in self._cache_parser_classnames):
       self._buff_parser.append({"indexor_url": indexor_url, "classname": classname})
 
     self.commit_parser()
 
   def commit_parser(self, force_commit = 0):
-    # consider do it later
-    if (0 and not force_commit):
+    self.commit_indexor(1)
+
+    if (self.ignore_db_write):
       return
 
-    self.connect()
-    self.commit_indexor(1)
+    if (not force_commit and len(self._buff_parser) >= self.min_buffered_rows):
+      return
 
     buff = self._buff_parser
     self._buff_parser = []
 
+    self.connect()
     sql = "INSERT IGNORE INTO `parsers` (`indexor_id`, `classname`) VALUES" + \
       "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(indexor_url)s), %(classname)s)"
     self._cursor.executemany(sql, buff)
     self._conn.commit()
 
-    self._cached_parser_classnames = list(set(
-      self._cached_parser_classnames +
+    self._cache_parser_classnames = list(set(
+      self._cache_parser_classnames +
       map(lambda x: x['classname'], buff)))
 
   # ==============================

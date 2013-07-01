@@ -1,11 +1,6 @@
 #usr/bin/python
 #-*- encoding:utf-8 -*-
 
-"""
-news-diff
-
-
-"""
 import lib
 import importlib
 
