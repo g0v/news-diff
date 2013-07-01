@@ -1,55 +1,96 @@
 # -*- encoding:utf-8 -*-
 
 class Ctlr_base:
-  """Controller base class
-  Serves utility methods and function templates"""
-  name = "Default Ctlr"
+  """
+  抓取並解析單篇文章的基底類別
+
+  調用流程：
+    news-diff.py
+    run()
+    dispatch_article() :
+    parse_article() :
+  """
+  # ==============================
+  # Controller Configs
+  # ==============================
   _date_online = 0
   _date_expire = None
 
-  @staticmethod
-  def to_date(value, fmts = None):
-    from datetime import datetime
+  # ==============================
+  #
+  # ==============================
+  def parse_article(self, payload):
+    """在類別中覆蓋此函式以建立操作邏輯"""
+    del(payload['response'])
+    #print(payload)
 
-    if type(value) is int:
-      # interpret as timestamp
-      return datetime(value)
+  def run(self):
+    """在類別中覆蓋此函式以建立操作邏輯"""
+    pass
 
-    if type(value) is datetime:
-      return value
-
-    if (fmts is None):
-      fmts = [
-        '%Y'
-      ]
-
-    for fmt in fmts:
-      try:
-        dt = datetime.strptime(value, fmt)
-        return dt
-      except ValueError:
-        continue
-
-    # no format found
-    raise ValueError('Can\'t parse date ' + value)
-
-  @staticmethod
-  def to_timestamp(value, fmts = None):
-    import time
-    return time.mktime(Ctlr_base.to_date(value, fmts).utctimetuple())
+  # ==============================
+  #
+  # ==============================
 
   def __init__(self):
     # date values
     pass
 
-  def parse_article(self, payload):
-    """處理針對單則新聞的 callback"""
-    del(payload['content'])
-    print(payload)
+  def dispatch_article(self, payload):
+    """
+    處理單則新聞的 callback
 
-  def run(self):
-    """Implement Program Logic Here"""
-    print(self)
-    print('running')
-    pass
+    調整 meta 內外的資訊，並轉發由 parse_article 分析與儲存。
+    """
 
+    try:
+      payload['pub_ts'] = Ctlr_base.to_timestamp(payload['meta']['pub_date'])
+    except Error: pass
+
+    Ctlr_base.move_out_of_meta(payload, 'url_rss')
+    Ctlr_base.move_out_of_meta(payload, 'title')
+
+    from . import db
+    db.save_article(payload)
+
+    # payload['meta']['ctlr'] = str(self.__class__)
+    self.parse_article(payload)
+
+  # ==============================
+  # Static utility methods
+  # ==============================
+
+  @staticmethod
+  def move_into_meta(payload, key):
+    try:
+      payload['meta'][key] = payload[key]
+      del payload[key]
+    except KeyError: pass
+
+  @staticmethod
+  def move_out_of_meta(payload, key):
+    try:
+      payload[key] = payload['meta'][key]
+      del payload['meta'][key]
+    except KeyError: pass
+
+  @staticmethod
+  def to_date(value):
+    """將 value 轉換為 datetime object, 包含時差資訊"""
+    from dateutil import parser
+    from datetime import datetime
+
+    if type(value) is int:
+      # interpret as timestamp, utc
+      return datetime(value)
+
+    if type(value) is datetime:
+      return value
+
+    dt = parser.parse(value)
+    return dt
+
+  @staticmethod
+  def to_timestamp(value):
+    import time
+    return time.mktime(Ctlr_base.to_date(value).utctimetuple())

@@ -3,10 +3,16 @@ from xml.dom import minidom
 
 from ctlr_base import Ctlr_base
 class Ctlr_base_RSS (Ctlr_base):
-  """Controller base class from RSS
-  Serves utility methods and function templates"""
+  """
+  透過 RSS 建立清單的基底類別
 
-  name = "Default Ctlr RSS"
+  調用流程：
+    news-diff.py
+    run()
+    dispatch_xml() : 解析抓回的 RSS，並送出對文章的 request
+    dispatch_article() :
+    parse_article() :
+  """
 
   # ==============================
   # Configs
@@ -21,31 +27,54 @@ class Ctlr_base_RSS (Ctlr_base):
   # content path
   _content_tag_name = 'item'
 
-  # tags to extract
+  # 要從 RSS 中截取，透過 meta 轉送的欄位列表
   _extract_list = {
-    "title": "title",
-    "link": "url",
-    "pubDate": "pub_date"
+    "title": {"key": "title"},
+    "link": {"key": "url"},
+    "pubDate": {"key": "pub_date"}
   }
 
-  def parse_xml(self, payload):
+  # ==============================
+  #
+  # ==============================
+
+  def dispatch_xml(self, payload):
     """解析 XML 格式的 RSS feed"""
-    dom = minidom.parseString(payload['content'])
+    dom = minidom.parseString(payload['response'])
     output = []
 
     from . import Fetcher
     f = Fetcher()
 
     for entry in dom.getElementsByTagName(self._content_tag_name):
-      parsed = {}
+      meta = {"url_rss": payload['url']}
       for tag in self._extract_list:
-        tmp = self.getTextByTagName(entry, tag)
-        if (tmp):
-          parsed[self._extract_list[tag]] = tmp
+        txt = self.getTextByTagName(entry, tag)
+        if (txt):
+          key = self._extract_list[tag]["key"]
+          meta[key] = txt
 
-      f.queue(parsed['url'], self.parse_article, parsed = parsed)
+      url = meta['url']
+      del (meta['url'])
 
+      f.queue(url, self.dispatch_article, meta = meta)
     f.start()
+
+  def dispatch_cb(self, format):
+    if (format == 'xml'):
+      return self.dispatch_xml
+
+    return None
+
+  def run(self):
+    from . import Fetcher
+    f = Fetcher()
+    f.queue(self._rss_url, self.dispatch_cb(self._format_src))
+    f.start()
+
+  # ==============================
+  # minidom related
+  # ==============================
 
   def getTextByTagName(self, node, tagName):
     return self.getText(node.getElementsByTagName(tagName)[0])
@@ -56,16 +85,3 @@ class Ctlr_base_RSS (Ctlr_base):
       if child.nodeType in [child.TEXT_NODE, child.CDATA_SECTION_NODE]:
         text += child.data
     return text
-
-  def parse_cb(self, format):
-    if (format == 'xml'):
-      return self.parse_xml
-
-    return None
-
-  def run(self):
-    from . import Fetcher
-    f = Fetcher()
-    f.queue(self._rss_url, self.parse_cb(self._format_src))
-    f.start()
-    pass

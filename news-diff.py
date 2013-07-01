@@ -13,3 +13,5 @@ for pkg in host_list:
 
   for ctlr in ns_tmp.Ctlrs:
     ctlr().run()
+
+lib.db.disconnect()
