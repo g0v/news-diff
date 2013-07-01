@@ -4,13 +4,14 @@
 import lib
 import importlib
 
-ctlrs = [
+host_list = [
   'appledaily'
 ]
 
-for pkg in ctlrs:
+for pkg in host_list:
   ns_tmp = importlib.import_module('lib.%s' % pkg)
-  ctlr = ns_tmp.Ctlr()
-  ctlr.run()
+
+  for ctlr in ns_tmp.Ctlrs:
+    ctlr().run()
 
 
