@@ -5,13 +5,13 @@ class Fetcher:
   def __init__(self):
     self._process_q = []
 
-  def queue(self, url, callback = None, **etc):
-    queue_body = {'url': url, 'cb': callback}
+  def queue(self, url, callback = None, category = None, meta = None):
+    queue_body = {'url': url, 'cb': callback, 'category': category}
 
-    try:
-      queue_body['meta'] = etc['meta']
-    except KeyError:
-      pass
+    if (meta):
+      queue_body['meta'] = meta
+    else:
+      queue_body['meta'] = {}
 
     self._process_q.append(queue_body)
 
@@ -25,7 +25,7 @@ class Fetcher:
         response = urllib.urlopen(proc['url']).read()
         proc['response'] = response
 
-        db.save_fetch(proc['url'], proc['response'])
+        db.save_fetch(proc['url'], proc['response'], proc['category'])
 
         if (proc['cb']):
           cb = proc['cb']

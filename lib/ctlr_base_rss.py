@@ -57,7 +57,7 @@ class Ctlr_base_RSS (Ctlr_base):
       url = meta['url']
       del (meta['url'])
 
-      f.queue(url, self.dispatch_article, meta = meta)
+      f.queue(url, self.dispatch_article, category="article", meta = meta)
     f.start()
 
   def dispatch_cb(self, format):
@@ -70,7 +70,7 @@ class Ctlr_base_RSS (Ctlr_base):
     from . import Fetcher
     f = Fetcher()
     for rss_url in self._rss_urls:
-      f.queue(rss_url, self.dispatch_cb(self._format_src))
+      f.queue(rss_url, self.dispatch_cb(self._format_src), category = "rss")
     f.start()
 
   # ==============================

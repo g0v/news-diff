@@ -44,8 +44,12 @@ class DB:
   #
   # Fetch
   #
-  def save_fetch(self, url, response):
-    self._buff_fetch.append({"url": url, "response": response})
+  def save_fetch(self, url, response, category = None):
+    cats_ignore_write = [] #[None, 'article']
+
+    if (category not in cats_ignore_write):
+      self._buff_fetch.append({"url": url, "response": response})
+
     self.commit_fetch()
 
   def commit_fetch(self, force_commit = 0):
