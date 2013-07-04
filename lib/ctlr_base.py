@@ -22,6 +22,7 @@ class Ctlr_Base:
 
     輸出之 Content 至少包含下列欄位：{
       'title': '[TITLE]'
+      'text': '[TEXT]'
       'html': '[HTML]',
     }
 
@@ -63,7 +64,8 @@ class Ctlr_Base:
       # content parsed successfully
       del content['response']
 
-      content["content_md5"] = Ctlr_Base.md5(content['content'])
+      content["text_md5"] = Ctlr_Base.md5(content['text'])
+      content["html_md5"] = Ctlr_Base.md5(content['html'])
       content["parser_name"] = str(self.__class__)
       db.save_content(content)
     else:
@@ -77,7 +79,7 @@ class Ctlr_Base:
   # ==============================
   @staticmethod
   def md5(unicode_str):
-    from md5 import md5
+    from hashlib import md5
     return md5(unicode_str.encode('utf-8')).hexdigest()
 
   @staticmethod
