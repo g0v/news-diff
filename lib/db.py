@@ -156,7 +156,7 @@ class DB:
   def save_content(self, _payload):
     from json import dumps
     from datetime import datetime
-    from . import Ctlr_base
+    from . import Ctlr_Base
 
     # deep copy so that we don't mess up the original payload
     payload = deepcopy(_payload)
@@ -171,20 +171,20 @@ class DB:
     self.commit_contents()
 
   def commit_contents(self, force_commit = 0):
-    return
-
     # Update FK
     if (self._will_execute(self._buff_contents, force_commit)):
       self.commit_indexors(1)
-      self.commit_parsers(1)
+      #self.commit_parsers(1)
 
     sql = "INSERT IGNORE INTO `contents` (" \
         "`pub_ts`, `created_on`, `indexor_id`, `parser_id`, `url`, `title`, " \
         "`content_md5`, `content`, `html`, `meta`" \
       " VALUES(" \
+        "%(pub_ts)s, CURRENT_TIMESTAMP, " \
         "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url_rss)s), " \
-        "%(url)s, %(pub_ts)s, %(title)s, %(meta)s, %(content)s, %(content_md5)s" \
-        ")"
+        "(SELECT `parser_id` FROM `parsers` WHERE `classname` = %(parser_name)s), " \
+        "%(url)s, %(title)s, %(content_md5)s, %(content)s, %(html)s, %(meta)s" \
+      ")"
     written = self._execute(sql, self._buff_contents, force_commit)
 
     # Update cache

@@ -1,8 +1,8 @@
 # -*- encoding: utf-8 -*-
 from xml.dom import minidom
-from ctlr_base import Ctlr_base
+from ctlr_base import Ctlr_Base
 
-class Ctlr_base_RSS (Ctlr_base):
+class Ctlr_Base_RSS (Ctlr_Base):
   """
   透過 RSS 建立清單的基底類別
   """
