@@ -5,4 +5,6 @@ class Ctlr(Ctlr_base_RSS):
     "http://www.appledaily.com.tw/rss/create/kind/sec/type/1077"
   ]
 
-  pass
+  def parse_article(self, payload):
+    print(list(payload))
+    return {'asdf': 'ghij'}

@@ -1,21 +1,14 @@
 # -*- encoding: utf-8 -*-
 from xml.dom import minidom
-
 from ctlr_base import Ctlr_base
+
 class Ctlr_base_RSS (Ctlr_base):
   """
   透過 RSS 建立清單的基底類別
-
-  調用流程：
-    news-diff.py
-    run()
-    dispatch_xml() : 解析抓回的 RSS，並送出對文章的 request
-    dispatch_article() :
-    parse_article() :
   """
 
   # ==============================
-  # Configs
+  # Configs to be overrided
   # ==============================
 
   # RSS URL list
@@ -68,9 +61,11 @@ class Ctlr_base_RSS (Ctlr_base):
 
   def run(self):
     from . import Fetcher
+
     f = Fetcher()
     for rss_url in self._rss_urls:
       f.queue(rss_url, self.dispatch_cb(self._format_src), category = "rss")
+
     f.start()
 
   # ==============================

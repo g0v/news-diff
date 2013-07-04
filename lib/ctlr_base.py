@@ -3,29 +3,35 @@
 class Ctlr_base:
   """
   抓取並解析單篇文章的基底類別
-
-  調用流程：
-    news-diff.py
-    run()
-    dispatch_article() :
-    parse_article() :
   """
   # ==============================
   # Controller Configs
   # ==============================
+
+  # Ctlr 生效時間
   _date_online = 0
+
+  # Ctlr 失效時間
   _date_expire = None
 
   # ==============================
-  #
+  # Abstract Methods
   # ==============================
   def parse_article(self, payload):
-    """在類別中覆蓋此函式以建立操作邏輯"""
-    del(payload['response'])
-    #print(payload)
+    """解析單篇文章，將解析後之結果回傳以儲存
+
+    輸出之 Content 至少包含下列欄位：{
+      'title': '[TITLE]'
+      'html': '[HTML]',
+    }
+
+    若解析失敗則回傳 False，由 dispatch_article 儲存 Article
+    """
+    pass
 
   def run(self):
-    """在類別中覆蓋此函式以建立操作邏輯"""
+    """在子類別中覆蓋此函式, 並將抓出的文章內容以 payload
+    型式傳至 dispatch_article """
     pass
 
   # ==============================
@@ -33,31 +39,38 @@ class Ctlr_base:
   # ==============================
 
   def __init__(self):
-    # date values
+    # @todo : date values
     pass
 
   def dispatch_article(self, payload):
     """
     處理單則新聞的 callback
 
-    調整 meta 內外的資訊，並轉發由 parse_article 分析與儲存。
+    對 payload 進行前處理，調用 parse_article 解析其內容，並儲存輸出結果。
     """
+    from md5 import md5
+    from . import db
 
     try:
       payload['pub_ts'] = Ctlr_base.to_timestamp(payload['meta']['pub_date'])
-    except Error: pass
+    except KeyError: pass
 
     Ctlr_base.move_out_of_meta(payload, 'url_rss')
     Ctlr_base.move_out_of_meta(payload, 'title')
 
-    from . import db
-    db.save_article(payload)
+    payload["response_md5"] = md5(payload['response']).hexdigest()
+    content = self.parse_article(payload)
+
+    if content:
+      content["content_md5"] = md5(content['content']).hexdigest()
+      db.save_content(content)
+    else:
+      db.save_article(payload)
 
     # payload['meta']['ctlr'] = str(self.__class__)
-    self.parse_article(payload)
 
   # ==============================
-  # Static utility methods
+  # Utilities
   # ==============================
 
   @staticmethod
