@@ -60,6 +60,9 @@ class Ctlr_Base:
     content = self.parse_article(payload)
 
     if content:
+      # content parsed successfully
+      del content['response']
+
       content["content_md5"] = Ctlr_Base.md5(content['content'])
       content["parser_name"] = str(self.__class__)
       db.save_content(content)

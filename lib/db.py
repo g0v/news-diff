@@ -1,6 +1,4 @@
 # -*-encoding:utf-8 -*-
-import MySQLdb
-from MySQLdb.cursors import SSCursor
 from copy import deepcopy
 
 class DB:
@@ -72,7 +70,11 @@ class DB:
     rows[:] = []
 
     self.connect()
-    self._cursor.executemany(sql, _rows)
+    try:
+      self._cursor.executemany(sql, _rows)
+    except Exception:
+      print(self._cursor._last_executed)
+
     self._conn.commit()
 
     return _rows
@@ -176,15 +178,20 @@ class DB:
       self.commit_indexors(1)
       #self.commit_parsers(1)
 
+    if False:
+      for entry in self._buff_contents:
+        entry['content'] = ''
+        entry['html'] = ''
+
     sql = "INSERT IGNORE INTO `contents` (" \
         "`pub_ts`, `created_on`, `indexor_id`, `parser_id`, `url`, `title`, " \
         "`content_md5`, `content`, `html`, `meta`" \
-      " VALUES(" \
+      ") VALUES(" \
         "%(pub_ts)s, CURRENT_TIMESTAMP, " \
         "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url_rss)s), " \
         "(SELECT `parser_id` FROM `parsers` WHERE `classname` = %(parser_name)s), " \
         "%(url)s, %(title)s, %(content_md5)s, %(content)s, %(html)s, %(meta)s" \
-      ")"
+      ") ON DUPLICATE KEY UPDATE updated_on = CURRENT_TIMESTAMP"
     written = self._execute(sql, self._buff_contents, force_commit)
 
     # Update cache
@@ -234,7 +241,10 @@ class DB:
   def connect(self, server = 'default'):
     if (not (self._conn and self._conn.open)):
       import json
+      import MySQLdb
+
       from os.path import dirname, join
+      from MySQLdb.cursors import SSCursor
 
       with open(join(dirname(dirname(__file__)), 'conf', 'db.json'), 'r') as fp:
         dbconf = json.load(fp)[server]

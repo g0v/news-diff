@@ -26,6 +26,7 @@ class Fetcher:
         proc['response'] = response
 
         db.save_fetch(proc['url'], proc['response'], proc['category'])
+        del proc['category'] # consumed here
 
         if (proc['cb']):
           cb = proc['cb']
