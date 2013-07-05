@@ -5,3 +5,4 @@ News-Diff
 REQUIREMENTS
 ------------------
 python-dateutil
+BeautySoup4
