@@ -16,7 +16,9 @@ class Ctlr(Ctlr_Base_RSS):
 
   def parse_article(self, payload):
     html = BeautifulSoup(payload['response'])
+
     wrapper = html.find(attrs={"class":"abdominis"})
+    if wrapper is None: return None
 
     title = wrapper.find(attrs={"class": 'mpatc'}).header
 
@@ -24,6 +26,7 @@ class Ctlr(Ctlr_Base_RSS):
       payload['title'] = title.get_text()
 
     content = wrapper.find(attrs={"class": 'articulum'})
+    if content is None: return None
 
     payload['html'] = unicode(content)
     payload['text'] = content.get_text()
