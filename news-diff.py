@@ -2,16 +2,22 @@
 #-*- encoding:utf-8 -*-
 
 import lib
+import proc from lib
 import importlib
 
-host_list = [
+# Fetch RSS
+ctlr_pkg_list = [
   'appledaily'
 ]
 
-for pkg in host_list:
-  ns_tmp = importlib.import_module('lib.%s' % pkg)
+if False:
+  for pkg in ctlr_pkg_list:
+    ns_tmp = importlib.import_module('lib.%s' % pkg)
 
-  for ctlr in ns_tmp.Ctlrs:
-    ctlr().run()
+    for ctlr in ns_tmp.Ctlrs:
+      ctlr().run()
+
+# Revisits
+
 
 lib.db.disconnect()

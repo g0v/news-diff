@@ -43,6 +43,16 @@ class Ctlr_Base:
     # @todo : date values
     pass
 
+  def _decorate_content(self, content):
+      del content['response']
+
+      Ctlr_Base.move_out_of_meta(payload, 'title')
+
+      content["text_md5"] = Ctlr_Base.md5(content['text'].encode('utf-8'))
+      content["html_md5"] = Ctlr_Base.md5(content['html'].encode('utf-8'))
+      content["parser_classname"] = str(self.__class__)
+      return content
+
   def dispatch_article(self, payload):
     """
     處理單則新聞的 callback
@@ -62,33 +72,28 @@ class Ctlr_Base:
 
     if content:
       # content parsed successfully
-      del content['response']
-
-      Ctlr_Base.move_out_of_meta(payload, 'title')
-
-      content["text_md5"] = Ctlr_Base.md5(content['text'].encode('utf-8'))
-      content["html_md5"] = Ctlr_Base.md5(content['html'].encode('utf-8'))
-      content["parser_classname"] = str(self.__class__)
+      self._decorate_content(content)
       db.save_content(content)
     else:
       payload["response_md5"] = Ctlr_Base.md5(payload['response'])
       db.save_article(payload)
 
   @staticmethod
-  def dispatch_catchups(self, payload):
+  def dispatch_article_catchups(self, payload):
     """處理前次解析失敗的資料"""
     raise Exception('Not Implemented, yet')
 
   @staticmethod
-  def dispatch_revisit(self, payload):
+  def dispatch_article_revisit(self, payload):
     """處理 revisit 取得之資料"""
 
     content = self.parse_article(payload)
     if not content:
       payload["response_md5"] = Ctlr_Base.md5(payload['response'])
-      db.save_article(payload)
+      return db.save_article(payload)
 
-    db.save_revisit(content_extract)
+    self._decorate_content(content)
+    db.save_revisit(content)
 
   # ==============================
   # Utilities
