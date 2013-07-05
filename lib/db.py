@@ -81,7 +81,7 @@ class DB:
 
     return _rows
 
-  def _load_as_list(self, sql):
+  def _load_into_list(self, sql):
     """取出資料表內容為 list(tuple)"""
     self.connect()
     self._cursor.execute(sql)
@@ -95,17 +95,17 @@ class DB:
     return buff
 
   def _update_hashtbl(self, tbl_name, data):
-    """更新 hash table 類的表格"""
+    """更新 hash table 類的表格; 會檢查 hash 是否重覆才寫入"""
     self.connect()
 
-    q_in = '"' + '","'.join([x[0] for x in data]) + '"'
+    q_in = ','.join([self._conn.escape(x[0]) for x in data])
     sql = "SELECT hash FROM `%s` WHERE hash IN (%s)" % (tbl_name, q_in)
 
     self._cursor.execute(sql)
     hashes_found = self._cursor.fetchall()
 
     self._cursor.executemany(
-      'INSERT INTO `' + tbl_name +'` (`body`,`hash`) VALUES (%(body)s, %(hash)s)',
+      'INSERT INTO `' + self._conn.escape_string(tbl_name) +'` (`body`,`hash`) VALUES (%(body)s, %(hash)s)',
       [{'hash':x[0], 'body': x[1]} for x in data if (x[0], ) not in hashes_found]
     )
     self._conn.commit()
@@ -192,8 +192,10 @@ class DB:
     self.commit_contents()
 
   def commit_contents(self, force_commit = 0):
-    """更新新聞內容；由於要持續更新 updated_on，因此不做快取"""
+    """更新新聞內容；由於要持續更新 updated_on，因此不做快取
+    @todo: 檢查是否已有同樣內容 (url, content_id)，決定使用 update or insert"""
     buff = self._buff_contents
+
     # Update FK
     if (not self._will_execute(buff, force_commit)):
       return
@@ -205,6 +207,7 @@ class DB:
     self._update_hashtbl('content_htmls', [(x['html_md5'], x['html']) for x in buff])
     self._update_hashtbl('content_texts', [(x['text_md5'], x['text']) for x in buff])
 
+    # do the insert
     sql = "INSERT INTO `contents` (" \
         "`pub_ts`, `created_on`, `indexor_id`, `parser_id`, `url`, `title`, " \
         "`meta`, `html_id`, `text_id`" \
@@ -221,6 +224,7 @@ class DB:
 
   #
   # Indexor
+  # 數量有限且不多，因此使用 cache 避免重覆寫入
   #
 
   def save_indexor(self, url):
@@ -234,21 +238,22 @@ class DB:
     self.commit_indexors()
 
   def commit_indexors(self, force_commit = 0):
+    buff = self._buff_indexors
+
+    if (not self._will_execute(buff, force_commit)):
+      return
+
     sql = "INSERT IGNORE INTO `indexors` (`url`) VALUES(%(url)s)"
-    written = self._execute(sql, self._buff_indexors, force_commit)
+    written = self._execute(sql, buff, force_commit)
 
     # Update cache
-    try:
-      self._cache_indexor_urls = list(set(
-        self._cache_indexor_urls +
-        map(lambda x: (x['url'], ), written)))
-    except Exception:
-      print(written)
-      raise Exception('gj')
+    self._cache_indexor_urls = list(set(
+      self._cache_indexor_urls +
+      map(lambda x: (x['url'], ), written)))
 
   def update_indexor_cache(self):
     sql = 'SELECT `url` FROM `indexors`'
-    self._cache_indexor_urls = self._load_as_list(sql)
+    self._cache_indexor_urls = self._load_into_list(sql)
 
 
   #

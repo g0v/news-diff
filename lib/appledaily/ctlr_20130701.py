@@ -4,8 +4,8 @@ from bs4 import BeautifulSoup
 class Ctlr(Ctlr_Base_RSS):
   _rss_urls = [
     "http://www.appledaily.com.tw/rss/create/kind/sec/type/11",
-    #"http://www.appledaily.com.tw/rss/create/kind/sec/type/151",
-    #"http://www.appledaily.com.tw/rss/create/kind/sec/type/1077",
+    "http://www.appledaily.com.tw/rss/create/kind/sec/type/151",
+    "http://www.appledaily.com.tw/rss/create/kind/sec/type/1077",
   ]
 
   def parse_article(self, payload):
