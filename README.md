@@ -6,3 +6,4 @@ REQUIREMENTS
 ------------------
 python-dateutil
 BeautySoup4
+mysql-python
