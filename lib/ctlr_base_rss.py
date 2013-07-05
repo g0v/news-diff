@@ -23,7 +23,7 @@ class Ctlr_Base_RSS (Ctlr_Base):
 
   # file format, override if necessary
   _parser = {
-    "format": "xml",
+    "format": "rss2_0",
     "holder": 'item',
     "extracts": {
       "title": {"key": "title"},
@@ -36,7 +36,7 @@ class Ctlr_Base_RSS (Ctlr_Base):
   #
   # ==============================
 
-  def dispatch_xml(self, payload):
+  def dispatch_rss2_0(self, payload):
     """解析 XML 格式的 RSS feed"""
     dom = minidom.parseString(payload['response'])
     output = []
@@ -59,8 +59,8 @@ class Ctlr_Base_RSS (Ctlr_Base):
     f.start()
 
   def dispatch_cb(self, format):
-    if (format == 'xml'):
-      return self.dispatch_xml
+    if (format == 'rss2_0'):
+      return self.dispatch_rss2_0
 
     return None
 

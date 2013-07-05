@@ -83,8 +83,10 @@ class DB:
       self.connect()
       self._cursor.executemany(sql, _rows)
       self._conn.commit()
-    except Exception:
+    except Exception as e:
       print(self._cursor._last_executed)
+      print('An error has occured: ')
+      print(str(type(e)) + ': ' + str(e))
 
     return _rows
 
@@ -103,6 +105,11 @@ class DB:
 
   def _update_hashtbl(self, tbl_name, data, columns = ['body', 'hash'], key = 'hash'):
     """更新 hash table 類的表格; 會檢查 hash 是否重覆才寫入"""
+
+    if len(data) == 0:
+      # nothing to write
+      return
+
     # escape
     tbl_name = self._conn.escape_string(tbl_name)
     key = self._conn.escape_string(key)
@@ -163,7 +170,6 @@ class DB:
     # deep copy so that we don't mess up the original payload
     payload = deepcopy(_payload)
     payload["meta"] = dumps(payload['meta'])
-    payload["pub_ts"] = datetime.fromtimestamp(payload["pub_ts"]).isoformat()
 
     self._buff_articles.append(payload)
     self.commit_articles()
@@ -178,9 +184,9 @@ class DB:
     self.commit_indexors(1)
 
     sql = "INSERT IGNORE INTO `articles` " + \
-      "(`indexor_id`, `url`, `pub_ts`, `title`, `response`, `response_md5`, `meta`) VALUES(" + \
+      "(`indexor_id`, `url`, `response`, `response_md5`, `meta`) VALUES(" + \
         "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url_rss)s), " + \
-        "%(url)s, %(pub_ts)s, %(title)s, %(response)s, %(response_md5)s, %(meta)s" + \
+        "%(url)s, %(response)s, %(response_md5)s, %(meta)s" + \
         ")"
     written = self._execute(sql, buff, force_commit)
 

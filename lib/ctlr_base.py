@@ -55,8 +55,8 @@ class Ctlr_Base:
       payload['pub_ts'] = Ctlr_Base.to_timestamp(payload['meta']['pub_date'])
     except KeyError: pass
 
-    Ctlr_Base.move_out_of_meta(payload, 'url_rss')
-    Ctlr_Base.move_out_of_meta(payload, 'title')
+    # Keep in meta so it's passed to content.meta
+    payload['url_rss'] = payload['meta']['url_rss']
 
     content = self.parse_article(payload)
 
@@ -64,23 +64,40 @@ class Ctlr_Base:
       # content parsed successfully
       del content['response']
 
-      content["text_md5"] = Ctlr_Base.md5(content['text'])
-      content["html_md5"] = Ctlr_Base.md5(content['html'])
+      Ctlr_Base.move_out_of_meta(payload, 'title')
+
+      content["text_md5"] = Ctlr_Base.md5(content['text'].encode('utf-8'))
+      content["html_md5"] = Ctlr_Base.md5(content['html'].encode('utf-8'))
       content["parser_classname"] = str(self.__class__)
       db.save_content(content)
     else:
       payload["response_md5"] = Ctlr_Base.md5(payload['response'])
       db.save_article(payload)
 
-    # payload['meta']['ctlr'] = str(self.__class__)
+  @staticmethod
+  def dispatch_catchups(self, payload):
+    """處理前次解析失敗的資料"""
+    raise Exception('Not Implemented, yet')
+
+  @staticmethod
+  def dispatch_revisit(self, payload):
+    """處理 revisit 取得之資料"""
+
+    content = self.parse_article(payload)
+    if not content:
+      payload["response_md5"] = Ctlr_Base.md5(payload['response'])
+      db.save_article(payload)
+
+    db.save_revisit(content_extract)
 
   # ==============================
   # Utilities
   # ==============================
+
   @staticmethod
   def md5(unicode_str):
     from hashlib import md5
-    return md5(unicode_str.encode('utf-8')).hexdigest()
+    return md5(unicode_str).hexdigest()
 
   @staticmethod
   def move_into_meta(payload, key):
