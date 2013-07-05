@@ -29,12 +29,16 @@ class DB:
     self.connect()
 
     # class variables
+
+    self._buff_hosts = []
+    self.update_host_cache ()
+
     self._buff_indexors = []
     self.update_indexor_cache()
 
-    #self._buff_parsers = []
-    #self._buff_indexor_parser = []
-    #self.update_parser_cache()
+    self._buff_parsers = []
+    self._buff_indexor_parser = []
+    self.update_parser_cache()
 
     self._buff_fetch = []
 
@@ -75,9 +79,12 @@ class DB:
     _rows = deepcopy(rows)
     rows[:] = []
 
-    self.connect()
-    self._cursor.executemany(sql, _rows)
-    self._conn.commit()
+    try:
+      self.connect()
+      self._cursor.executemany(sql, _rows)
+      self._conn.commit()
+    except Exception:
+      print(self._cursor._last_executed)
 
     return _rows
 
@@ -94,19 +101,32 @@ class DB:
 
     return buff
 
-  def _update_hashtbl(self, tbl_name, data):
+  def _update_hashtbl(self, tbl_name, data, columns = ['body', 'hash'], key = 'hash'):
     """更新 hash table 類的表格; 會檢查 hash 是否重覆才寫入"""
+    # escape
+    tbl_name = self._conn.escape_string(tbl_name)
+    key = self._conn.escape_string(key)
+    columns = [self._conn.escape_string(x) for x in columns]
+
     self.connect()
 
-    q_in = ','.join([self._conn.escape(x[0]) for x in data])
-    sql = "SELECT hash FROM `%s` WHERE hash IN (%s)" % (tbl_name, q_in)
-
+    sql = "SELECT `%s` FROM `%s` WHERE `%s` IN (%s)" % (
+      key, tbl_name, key,
+      ','.join([self._conn.escape(x[key]) for x in data])
+    )
     self._cursor.execute(sql)
     hashes_found = self._cursor.fetchall()
 
+    sql = 'INSERT IGNORE INTO `%s` (%s) VALUES (' % (
+      tbl_name,
+      ','.join([('`%s`' % x) for x in columns])
+    )
+    sql += ','.join([('%(' + x + ')s') for x in columns])
+    sql += ')'
+
     self._cursor.executemany(
-      'INSERT INTO `' + self._conn.escape_string(tbl_name) +'` (`body`,`hash`) VALUES (%(body)s, %(hash)s)',
-      [{'hash':x[0], 'body': x[1]} for x in data if (x[0], ) not in hashes_found]
+      sql,
+      [x for x in data if (x[key], ) not in hashes_found]
     )
     self._conn.commit()
 
@@ -144,8 +164,6 @@ class DB:
     payload = deepcopy(_payload)
     payload["meta"] = dumps(payload['meta'])
     payload["pub_ts"] = datetime.fromtimestamp(payload["pub_ts"]).isoformat()
-
-    self.save_indexor(payload['url_rss'])
 
     self._buff_articles.append(payload)
     self.commit_articles()
@@ -186,8 +204,6 @@ class DB:
     payload["meta"] = dumps(payload['meta'])
     payload["pub_ts"] = datetime.fromtimestamp(payload["pub_ts"]).isoformat()
 
-    self.save_indexor(payload['url_rss'])
-
     buff.append(payload)
     self.commit_contents()
 
@@ -196,16 +212,16 @@ class DB:
     @todo: 檢查是否已有同樣內容 (url, content_id)，決定使用 update or insert"""
     buff = self._buff_contents
 
-    # Update FK
     if (not self._will_execute(buff, force_commit)):
       return
 
+    # Update FK
     self.commit_indexors(1)
-    #self.commit_parsers(1)
+    self.commit_parsers(1)
 
     # update content text & html
-    self._update_hashtbl('content_htmls', [(x['html_md5'], x['html']) for x in buff])
-    self._update_hashtbl('content_texts', [(x['text_md5'], x['text']) for x in buff])
+    self._update_hashtbl('content_htmls', [{"hash": x['html_md5'], "body": x['html']} for x in buff])
+    self._update_hashtbl('content_texts', [{"hash": x['text_md5'], "body": x['text']} for x in buff])
 
     # do the insert
     sql = "INSERT INTO `contents` (" \
@@ -214,7 +230,7 @@ class DB:
       ") VALUES(" \
         "%(pub_ts)s, CURRENT_TIMESTAMP, " \
         "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url_rss)s), " \
-        "(SELECT `parser_id` FROM `parsers` WHERE `classname` = %(parser_name)s), " \
+        "(SELECT `parser_id` FROM `parsers` WHERE `classname` = %(parser_classname)s), " \
         "%(url)s, %(title)s, %(meta)s, " \
         "(SELECT `html_id` FROM `content_htmls` WHERE `hash` = %(html_md5)s), " \
         "(SELECT `text_id` FROM `content_texts` WHERE `hash` = %(text_md5)s)" \
@@ -223,43 +239,135 @@ class DB:
     written = self._execute(sql, self._buff_contents, force_commit)
 
   #
-  # Indexor
+  # Host
   # 數量有限且不多，因此使用 cache 避免重覆寫入
   #
 
-  def save_indexor(self, url):
+  def save_host(self, host):
+    buff = self._buff_hosts
+    cache = self._cache_host_urls
+
+    if ((host['url'],) not in cache):
+      if (not any([x['url'] == host['url'] for x in buff])):
+        buff.append(host)
+
+    self.commit_hosts()
+
+  def commit_hosts(self, force_commit = 0):
+    buff = self._buff_hosts
+    cache = self._cache_host_urls
+
+    if (not self._will_execute(buff, force_commit)):
+      return
+
+    sql = "INSERT IGNORE INTO `hosts` (`name`, `url`" \
+      ") VALUES (%(name)s, %(url)s)"
+    written = self._execute(sql, buff, force_commit)
+
+    # Update cache
+    cache[:] = list(set(
+      cache +
+      map(lambda x: (x['url'], ), written)))
+
+  def update_host_cache(self):
+    sql = 'SELECT `url` FROM `hosts`'
+    self._cache_host_urls = self._load_into_list(sql)
+
+  #
+  # Indexor
+  #
+
+  def save_indexor(self, source):
     buff = self._buff_indexors
     cache = self._cache_indexor_urls
 
-    if ((url,) not in cache):
-      if (not any([x['url'] == url for x in buff])):
-        buff.append({"url": url})
+    if ((source['url'],) not in cache):
+      if (not any([x['url'] == source['url'] for x in buff])):
+        buff.append(source)
 
     self.commit_indexors()
 
   def commit_indexors(self, force_commit = 0):
     buff = self._buff_indexors
+    cache = self._cache_indexor_urls
 
     if (not self._will_execute(buff, force_commit)):
       return
+    self.commit_hosts(1)
 
-    sql = "INSERT IGNORE INTO `indexors` (`url`) VALUES(%(url)s)"
+    sql = "INSERT IGNORE INTO `indexors` (`url`, `title`, `host_id`" \
+      ") VALUES (%(url)s, %(title)s, " \
+      "(SELECT `host_id` FROM `hosts` WHERE `url` = %(host_url)s))"
     written = self._execute(sql, buff, force_commit)
 
     # Update cache
-    self._cache_indexor_urls = list(set(
-      self._cache_indexor_urls +
+    cache[:] = list(set(
+      cache +
       map(lambda x: (x['url'], ), written)))
 
   def update_indexor_cache(self):
     sql = 'SELECT `url` FROM `indexors`'
     self._cache_indexor_urls = self._load_into_list(sql)
 
-
   #
   # Parser
   #
 
+  def save_parser(self, parser):
+    buff = self._buff_parsers
+    cache = self._cache_parser_classnames
+
+    if ((parser['classname'],) not in cache):
+      if (not any([x['classname'] == parser['classname'] for x in buff])):
+        buff.append(parser)
+
+    self.commit_indexor_parser()
+
+  def save_indexor_parser(self, pair):
+    buff = self._buff_indexor_parser
+
+    if (not pair in buff):
+      buff.append(pair)
+
+    self.commit_indexor_parser()
+
+  def commit_parsers(self, force_commit = 0):
+    buff = self._buff_parsers
+    cache = self._cache_parser_classnames
+
+    if (not self._will_execute(buff, force_commit)):
+      return
+
+    sql = "INSERT IGNORE INTO `parsers` (`classname`" \
+      ") VALUES (%(classname)s)"
+    written = self._execute(sql, buff, force_commit)
+
+    # Update cache
+    cache[:] = list(set(
+      cache +
+      map(lambda x: (x['classname'], ), written)))
+
+  def commit_indexor_parser(self, force_commit = 0):
+    buff = self._buff_indexor_parser
+
+    if (not self._will_execute(buff, force_commit)):
+      return
+
+    self.commit_indexors(1)
+    self.commit_parsers(1)
+
+    sql = "INSERT IGNORE INTO `indexor_parser` (" \
+        "`indexor_id`, `parser_id`" \
+      ") VALUES ("\
+        "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url)s), " \
+        "(SELECT `parser_id` FROM `parsers` WHERE `classname` = %(classname)s)" \
+      ")"
+
+    written = self._execute(sql, buff, force_commit)
+
+  def update_parser_cache(self):
+    sql = 'SELECT `classname` FROM `parsers`'
+    self._cache_parser_classnames = self._load_into_list(sql)
 
   # ==============================
   # Connection
@@ -283,8 +391,15 @@ class DB:
       self._cursor = self._conn.cursor(cursorclass=SSCursor)
 
   def flush(self):
+    self.commit_indexor_parser(1)
+
+    # called from above
+    #self.commit_indexors(1)
+    #self.commit_parsers(1)
+    # called from commit_indexors()
+    #self.commit_hosts(1)
+
     self.commit_fetch(1)
-    self.commit_indexors(1)
     self.commit_articles(1)
     self.commit_contents(1)
 

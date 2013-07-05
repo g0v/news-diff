@@ -6,6 +6,8 @@
 唯一例外是 contents /articles 的 last_seen_on 欄位，表示最後一次抓出同樣資料
 的時間。
 
+由產生資料的物件負責呼叫 db.save_*
+
 ## DB ##
 
 ### InnoDB Autoirement ###

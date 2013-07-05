@@ -66,7 +66,7 @@ class Ctlr_Base:
 
       content["text_md5"] = Ctlr_Base.md5(content['text'])
       content["html_md5"] = Ctlr_Base.md5(content['html'])
-      content["parser_name"] = str(self.__class__)
+      content["parser_classname"] = str(self.__class__)
       db.save_content(content)
     else:
       payload["response_md5"] = Ctlr_Base.md5(payload['response'])

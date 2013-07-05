@@ -11,20 +11,25 @@ class Ctlr_Base_RSS (Ctlr_Base):
   # Configs to be overrided
   # ==============================
 
-  # RSS URL list
-  _rss_urls = []
+  # Controller definition
+  _my_host = {
+    # "name": "蘋果日報",
+    # "url": "http://www.appledaily.com.tw/",
+  }
 
-  # file format
-  _format_src = 'xml'
+  _my_feeds = [
+    #{"title": "要聞", "url": "http://www.appledaily.com.tw/rss/create/kind/sec/type/11"},
+  ]
 
-  # content path
-  _content_tag_name = 'item'
-
-  # 要從 RSS 中截取，透過 meta 轉送的欄位列表
-  _extract_list = {
-    "title": {"key": "title"},
-    "link": {"key": "url"},
-    "pubDate": {"key": "pub_date"}
+  # file format, override if necessary
+  _parser = {
+    "format": "xml",
+    "holder": 'item',
+    "extracts": {
+      "title": {"key": "title"},
+      "link": {"key": "url"},
+      "pubDate": {"key": "pub_date"}
+    }
   }
 
   # ==============================
@@ -39,12 +44,12 @@ class Ctlr_Base_RSS (Ctlr_Base):
     from . import Fetcher
     f = Fetcher()
 
-    for entry in dom.getElementsByTagName(self._content_tag_name):
+    for entry in dom.getElementsByTagName(self._parser['holder']):
       meta = {"url_rss": payload['url']}
-      for tag in self._extract_list:
+      for tag in self._parser['extracts']:
         txt = self.getTextByTagName(entry, tag)
         if (txt):
-          key = self._extract_list[tag]["key"]
+          key = self._parser['extracts'][tag]["key"]
           meta[key] = txt
 
       url = meta['url']
@@ -60,11 +65,29 @@ class Ctlr_Base_RSS (Ctlr_Base):
     return None
 
   def run(self):
-    from . import Fetcher
+    from . import Fetcher, db
+
+    db.save_host(self._my_host)
 
     f = Fetcher()
-    for rss_url in self._rss_urls:
-      f.queue(rss_url, self.dispatch_cb(self._format_src), category = "rss")
+    for rss in self._my_feeds:
+      if ('title' not in rss):
+        rss['title'] = None
+
+      if ('host_url' not in rss):
+        rss['host_url'] = self._my_host['url']
+
+      db.save_parser({"classname": str(self.__class__)})
+      db.save_indexor(rss)
+      db.save_indexor_parser({
+        'url': rss['url'],
+        'classname': str(self.__class__)
+      })
+
+      f.queue(
+        rss['url'],
+        self.dispatch_cb(self._parser['format']),
+        category = "rss")
 
     f.start()
 
