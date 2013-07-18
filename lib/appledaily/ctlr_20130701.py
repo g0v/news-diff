@@ -14,7 +14,7 @@ class Ctlr(Ctlr_Base_RSS):
     #{"url": "http://www.appledaily.com.tw/rss/create/kind/sec/type/1077"},
   ]
 
-  def parse_article(self, payload):
+  def parse_response(self, payload):
     html = BeautifulSoup(payload['response'])
 
     wrapper = html.find(attrs={"class":"abdominis"})

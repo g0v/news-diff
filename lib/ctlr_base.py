@@ -17,16 +17,16 @@ class Ctlr_Base:
   # ==============================
   # Abstract Methods
   # ==============================
-  def parse_article(self, payload):
-    """解析單篇文章，將解析後之結果回傳以儲存
+  def parse_response(self, payload):
+    """解析 fetcher 抓回之 response
 
-    輸出之 Content 至少包含下列欄位：{
+    輸出之 article 需包含下列欄位：{
       'title': '[TITLE]'
       'text': '[TEXT]'
       'html': '[HTML]',
     }
 
-    若解析失敗則回傳 False，由 dispatch_article 儲存 Article
+    若解析失敗則回傳 False，由 dispatch_response 儲存
     """
     pass
 
@@ -43,19 +43,19 @@ class Ctlr_Base:
     # @todo : date values
     pass
 
-  def _decorate_content(self, content):
-      del content['response']
+  def _decorate_article(self, article):
+      del article['response']
 
       Ctlr_Base.move_out_of_meta(payload, 'title')
 
-      content["text_md5"] = Ctlr_Base.md5(content['text'].encode('utf-8'))
-      content["html_md5"] = Ctlr_Base.md5(content['html'].encode('utf-8'))
-      content["parser_classname"] = str(self.__class__)
-      return content
+      article["text_md5"] = Ctlr_Base.md5(article['text'].encode('utf-8'))
+      article["html_md5"] = Ctlr_Base.md5(article['html'].encode('utf-8'))
+      article["parser_classname"] = str(self.__class__)
+      return article
 
-  def dispatch_article(self, payload):
+  def dispatch_response(self, payload):
     """
-    處理單則新聞的 callback
+    處理單則新聞 response 的 callback
 
     對 payload 進行前處理，調用 parse_article 解析其內容，並儲存輸出結果。
     """
@@ -68,32 +68,32 @@ class Ctlr_Base:
     # Keep in meta so it's passed to content.meta
     payload['url_rss'] = payload['meta']['url_rss']
 
-    content = self.parse_article(payload)
+    article = self.parse_response(payload)
 
-    if content:
-      # content parsed successfully
-      self._decorate_content(content)
-      db.save_content(content)
+    if article:
+      # parsed successfully
+      self._decorate_article(article)
+      db.save_article(article)
     else:
       payload["response_md5"] = Ctlr_Base.md5(payload['response'])
-      db.save_article(payload)
+      db.save_response(payload)
 
   @staticmethod
-  def dispatch_article_catchups(self, payload):
+  def dispatch_catchup(self, payload):
     """處理前次解析失敗的資料"""
     raise Exception('Not Implemented, yet')
 
   @staticmethod
-  def dispatch_article_revisit(self, payload):
+  def dispatch_revisit(self, payload):
     """處理 revisit 取得之資料"""
 
-    content = self.parse_article(payload)
-    if not content:
+    article = self.parse_response(payload)
+    if not article:
       payload["response_md5"] = Ctlr_Base.md5(payload['response'])
-      return db.save_article(payload)
+      return db.save_response(payload)
 
-    self._decorate_content(content)
-    db.save_revisit(content)
+    self._decorate_article(article)
+    db.save_revisit(article)
 
   # ==============================
   # Utilities

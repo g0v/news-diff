@@ -77,9 +77,9 @@ class Ctlr_Base_RSS (Ctlr_Base):
       if ('host_url' not in rss):
         rss['host_url'] = self._my_host['url']
 
-      db.save_parser({"classname": str(self.__class__)})
-      db.save_indexor(rss)
-      db.save_indexor_parser({
+      db.save_ctlr({"classname": str(self.__class__)})
+      db.save_feed(rss)
+      db.save_ctlr_feed({
         'url': rss['url'],
         'classname': str(self.__class__)
       })

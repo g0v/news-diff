@@ -6,10 +6,10 @@ class DB:
 
   包含下列資料：
    - fetch: 處理透過 fetcher 抓下的資料，轉存至 fetches 表
-   - indexor: 對應至所有資料來源 (eg, RSS, web page)，在 article 中作為 FK
-   - parser: 對應至所有被調用過的 Parser，在 article 中作為 FK
+   - feed: 對應至所有資料來源 (eg, RSS, web page)，在 article 中作為 FK
+   - ctlr: 對應至所有被調用過的 ctlr，在 article 中作為 FK
+   - response
    - article
-   - content
   """
 
   # 當待寫入 row 到達 _min_row 時才寫入
@@ -33,21 +33,20 @@ class DB:
     self._buff_hosts = []
     self.update_host_cache ()
 
-    self._buff_indexors = []
-    self.update_indexor_cache()
+    self._buff_feeds = []
+    self.update_feed_cache()
 
-    self._buff_parsers = []
-    self._buff_indexor_parser = []
-    self.update_parser_cache()
+    self._buff_ctlrs = []
+    self._buff_ctlr_feed = []
+    self.update_ctlr_cache()
 
     self._buff_fetch = []
 
-    self._buff_articles = []
-    self._buff_article_responses = []
+    self._buff_responses = []
 
-    self._buff_contents = []
-    self._buff_content_texts = []
-    self._buff_content_htmls = []
+    self._buff_articles = []
+    self._buff_article_texts = []
+    self._buff_article_htmls = []
 
   @classmethod
   def forge(self):
@@ -159,10 +158,10 @@ class DB:
     self._execute(sql, self._buff_fetch, force_commit)
 
   #
-  # Article, 僅在 parse 失敗時寫入，因此積極重寫
+  # 僅在 parse 失敗時寫入，因此積極重寫
   #
 
-  def save_article(self, _payload):
+  def save_response(self, _payload):
     from json import dumps
     from datetime import datetime
     from . import Ctlr_Base
@@ -171,35 +170,35 @@ class DB:
     payload = deepcopy(_payload)
     payload["meta"] = dumps(payload['meta'])
 
-    self._buff_articles.append(payload)
-    self.commit_articles()
+    self._buff_responses.append(payload)
+    self.commit_responses()
 
-  def commit_articles(self, force_commit = 0):
-    buff = self._buff_articles
+  def commit_responses(self, force_commit = 0):
+    buff = self._buff_responses
 
     if (not self._will_execute(buff, force_commit)):
       return
 
     # Update FK
-    self.commit_indexors(1)
+    self.commit_feeds(1)
 
-    sql = "INSERT IGNORE INTO `articles` " + \
-      "(`indexor_id`, `url`, `response`, `response_md5`, `meta`) VALUES(" + \
-        "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url_rss)s), " + \
+    sql = "INSERT IGNORE INTO `responses` " + \
+      "(`feed_id`, `url`, `response`, `response_md5`, `meta`) VALUES(" + \
+        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(url_rss)s), " + \
         "%(url)s, %(response)s, %(response_md5)s, %(meta)s" + \
         ")"
     written = self._execute(sql, buff, force_commit)
 
   #
-  # Content
+  # article
   #
 
-  def save_content(self, _payload):
+  def save_article(self, _payload):
     from json import dumps
     from datetime import datetime
     from . import Ctlr_Base
 
-    buff = self._buff_contents
+    buff = self._buff_articles
 
     # 同批抓到同樣內容，不考慮是否變動，直接忽略
     if any([x['text_md5'] == _payload['text_md5'] and x['url'] == _payload['md5'] for x in buff]):
@@ -211,38 +210,38 @@ class DB:
     payload["pub_ts"] = datetime.fromtimestamp(payload["pub_ts"]).isoformat()
 
     buff.append(payload)
-    self.commit_contents()
+    self.commit_articles()
 
-  def commit_contents(self, force_commit = 0):
+  def commit_articles(self, force_commit = 0):
     """更新新聞內容；由於要持續更新 updated_on，因此不做快取
-    @todo: 檢查是否已有同樣內容 (url, content_id)，決定使用 update or insert"""
-    buff = self._buff_contents
+    @todo: 檢查是否已有同樣內容 (url, article_id)，決定使用 update or insert"""
+    buff = self._buff_articles
 
     if (not self._will_execute(buff, force_commit)):
       return
 
     # Update FK
-    self.commit_indexors(1)
-    self.commit_parsers(1)
+    self.commit_feeds(1)
+    self.commit_ctlrs(1)
 
-    # update content text & html
-    self._update_hashtbl('content_htmls', [{"hash": x['html_md5'], "body": x['html']} for x in buff])
-    self._update_hashtbl('content_texts', [{"hash": x['text_md5'], "body": x['text']} for x in buff])
+    # update article text & html
+    self._update_hashtbl('article_htmls', [{"hash": x['html_md5'], "body": x['html']} for x in buff])
+    self._update_hashtbl('article_texts', [{"hash": x['text_md5'], "body": x['text']} for x in buff])
 
     # do the insert
-    sql = "INSERT INTO `contents` (" \
-        "`pub_ts`, `created_on`, `indexor_id`, `parser_id`, `url`, `title`, " \
+    sql = "INSERT INTO `articles` (" \
+        "`pub_ts`, `created_on`, `feed_id`, `ctlr_id`, `url`, `title`, " \
         "`meta`, `html_id`, `text_id`" \
       ") VALUES(" \
         "%(pub_ts)s, CURRENT_TIMESTAMP, " \
-        "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url_rss)s), " \
-        "(SELECT `parser_id` FROM `parsers` WHERE `classname` = %(parser_classname)s), " \
+        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(url_rss)s), " \
+        "(SELECT `ctlr_id` FROM `ctlrs` WHERE `classname` = %(ctlr_classname)s), " \
         "%(url)s, %(title)s, %(meta)s, " \
-        "(SELECT `html_id` FROM `content_htmls` WHERE `hash` = %(html_md5)s), " \
-        "(SELECT `text_id` FROM `content_texts` WHERE `hash` = %(text_md5)s)" \
+        "(SELECT `html_id` FROM `article_htmls` WHERE `hash` = %(html_md5)s), " \
+        "(SELECT `text_id` FROM `article_texts` WHERE `hash` = %(text_md5)s)" \
       ") ON DUPLICATE KEY UPDATE last_seen_on = CURRENT_TIMESTAMP"
 
-    written = self._execute(sql, self._buff_contents, force_commit)
+    written = self._execute(sql, self._buff_articles, force_commit)
 
   #
   # Host
@@ -280,28 +279,28 @@ class DB:
     self._cache_host_urls = self._load_into_list(sql)
 
   #
-  # Indexor
+  # feed
   #
 
-  def save_indexor(self, source):
-    buff = self._buff_indexors
-    cache = self._cache_indexor_urls
+  def save_feed(self, source):
+    buff = self._buff_feeds
+    cache = self._cache_feed_urls
 
     if ((source['url'],) not in cache):
       if (not any([x['url'] == source['url'] for x in buff])):
         buff.append(source)
 
-    self.commit_indexors()
+    self.commit_feeds()
 
-  def commit_indexors(self, force_commit = 0):
-    buff = self._buff_indexors
-    cache = self._cache_indexor_urls
+  def commit_feeds(self, force_commit = 0):
+    buff = self._buff_feeds
+    cache = self._cache_feed_urls
 
     if (not self._will_execute(buff, force_commit)):
       return
     self.commit_hosts(1)
 
-    sql = "INSERT IGNORE INTO `indexors` (`url`, `title`, `host_id`" \
+    sql = "INSERT IGNORE INTO `feeds` (`url`, `title`, `host_id`" \
       ") VALUES (%(url)s, %(title)s, " \
       "(SELECT `host_id` FROM `hosts` WHERE `url` = %(host_url)s))"
     written = self._execute(sql, buff, force_commit)
@@ -311,40 +310,40 @@ class DB:
       cache +
       map(lambda x: (x['url'], ), written)))
 
-  def update_indexor_cache(self):
-    sql = 'SELECT `url` FROM `indexors`'
-    self._cache_indexor_urls = self._load_into_list(sql)
+  def update_feed_cache(self):
+    sql = 'SELECT `url` FROM `feeds`'
+    self._cache_feed_urls = self._load_into_list(sql)
 
   #
-  # Parser
+  # ctlr
   #
 
-  def save_parser(self, parser):
-    buff = self._buff_parsers
-    cache = self._cache_parser_classnames
+  def save_ctlr(self, ctlr):
+    buff = self._buff_ctlrs
+    cache = self._cache_ctlr_classnames
 
-    if ((parser['classname'],) not in cache):
-      if (not any([x['classname'] == parser['classname'] for x in buff])):
-        buff.append(parser)
+    if ((ctlr['classname'],) not in cache):
+      if (not any([x['classname'] == ctlr['classname'] for x in buff])):
+        buff.append(ctlr)
 
-    self.commit_indexor_parser()
+    self.commit_ctlr_feed()
 
-  def save_indexor_parser(self, pair):
-    buff = self._buff_indexor_parser
+  def save_ctlr_feed(self, pair):
+    buff = self._buff_ctlr_feed
 
     if (not pair in buff):
       buff.append(pair)
 
-    self.commit_indexor_parser()
+    self.commit_ctlr_feed()
 
-  def commit_parsers(self, force_commit = 0):
-    buff = self._buff_parsers
-    cache = self._cache_parser_classnames
+  def commit_ctlrs(self, force_commit = 0):
+    buff = self._buff_ctlrs
+    cache = self._cache_ctlr_classnames
 
     if (not self._will_execute(buff, force_commit)):
       return
 
-    sql = "INSERT IGNORE INTO `parsers` (`classname`" \
+    sql = "INSERT IGNORE INTO `ctlrs` (`classname`" \
       ") VALUES (%(classname)s)"
     written = self._execute(sql, buff, force_commit)
 
@@ -353,27 +352,27 @@ class DB:
       cache +
       map(lambda x: (x['classname'], ), written)))
 
-  def commit_indexor_parser(self, force_commit = 0):
-    buff = self._buff_indexor_parser
+  def commit_ctlr_feed(self, force_commit = 0):
+    buff = self._buff_ctlr_feed
 
     if (not self._will_execute(buff, force_commit)):
       return
 
-    self.commit_indexors(1)
-    self.commit_parsers(1)
+    self.commit_feeds(1)
+    self.commit_ctlrs(1)
 
-    sql = "INSERT IGNORE INTO `indexor_parser` (" \
-        "`indexor_id`, `parser_id`" \
+    sql = "INSERT IGNORE INTO `ctlr_feed` (" \
+        "`feed_id`, `ctlr_id`" \
       ") VALUES ("\
-        "(SELECT `indexor_id` FROM `indexors` WHERE `url` = %(url)s), " \
-        "(SELECT `parser_id` FROM `parsers` WHERE `classname` = %(classname)s)" \
+        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(url)s), " \
+        "(SELECT `ctlr_id` FROM `ctlrs` WHERE `classname` = %(classname)s)" \
       ")"
 
     written = self._execute(sql, buff, force_commit)
 
-  def update_parser_cache(self):
-    sql = 'SELECT `classname` FROM `parsers`'
-    self._cache_parser_classnames = self._load_into_list(sql)
+  def update_ctlr_cache(self):
+    sql = 'SELECT `classname` FROM `ctlrs`'
+    self._cache_ctlr_classnames = self._load_into_list(sql)
 
   # ==============================
   # Connection
@@ -397,17 +396,17 @@ class DB:
       self._cursor = self._conn.cursor(cursorclass=SSCursor)
 
   def flush(self):
-    self.commit_indexor_parser(1)
+    self.commit_ctlr_feed(1)
 
     # called from above
-    #self.commit_indexors(1)
-    #self.commit_parsers(1)
-    # called from commit_indexors()
+    #self.commit_feeds(1)
+    #self.commit_ctlrs(1)
+    # called from commit_feeds()
     #self.commit_hosts(1)
 
     self.commit_fetch(1)
+    self.commit_responses(1)
     self.commit_articles(1)
-    self.commit_contents(1)
 
   def disconnect(self):
     self.flush()
