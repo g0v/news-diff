@@ -2,10 +2,11 @@
 
 class Ctlr_Base:
   """
-  抓取並解析單篇文章的基底類別
+  抓取並解析單篇文章的基底類別；
+  針對各種型態的新聞列表 (eg. RSS, email)，需各自實作繼承用類別
   """
   # ==============================
-  # Controller Configs
+  # Configs for Implementing Ctlr
   # ==============================
 
   # Ctlr 生效時間
@@ -15,8 +16,28 @@ class Ctlr_Base:
   _date_expire = None
 
   # ==============================
+  # Configs for Base Ctlrs
+  # ==============================
+
+  # Controller definition
+  _my_host = {
+    # "name": "蘋果日報",
+    # "url": "http://www.appledaily.com.tw/",
+  }
+
+  _my_feeds = [
+    #{"title": "要聞", "url": "http://www.appledaily.com.tw/rss/create/kind/sec/type/11"},
+  ]
+
+  # ==============================
   # Abstract Methods
   # ==============================
+
+  def run(self):
+    """在子類別中覆蓋此函式, 並將抓出的文章內容以 payload
+    型式傳至 dispatch_article """
+    pass
+
   def parse_response(self, payload):
     """解析 fetcher 抓回之 response
 
@@ -29,12 +50,6 @@ class Ctlr_Base:
     若解析失敗則回傳 False，由 dispatch_response 儲存
     """
     pass
-
-  def run(self):
-    """在子類別中覆蓋此函式, 並將抓出的文章內容以 payload
-    型式傳至 dispatch_article """
-    pass
-
   # ==============================
   #
   # ==============================
@@ -46,11 +61,12 @@ class Ctlr_Base:
   def _decorate_article(self, article):
       del article['response']
 
-      Ctlr_Base.move_out_of_meta(payload, 'title')
+      Ctlr_Base.move_out_of_meta(article, 'title')
 
+      article['meta']["status"] = "article"
       article["text_md5"] = Ctlr_Base.md5(article['text'].encode('utf-8'))
       article["html_md5"] = Ctlr_Base.md5(article['html'].encode('utf-8'))
-      article["parser_classname"] = str(self.__class__)
+      article["ctlr_classname"] = str(self.__class__)
       return article
 
   def dispatch_response(self, payload):

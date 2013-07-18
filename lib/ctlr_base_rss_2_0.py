@@ -2,7 +2,7 @@
 from xml.dom import minidom
 from ctlr_base import Ctlr_Base
 
-class Ctlr_Base_RSS (Ctlr_Base):
+class Ctlr_Base_RSS_2_0 (Ctlr_Base):
   """
   透過 RSS 建立清單的基底類別
   """
@@ -11,19 +11,9 @@ class Ctlr_Base_RSS (Ctlr_Base):
   # Configs to be overrided
   # ==============================
 
-  # Controller definition
-  _my_host = {
-    # "name": "蘋果日報",
-    # "url": "http://www.appledaily.com.tw/",
-  }
-
-  _my_feeds = [
-    #{"title": "要聞", "url": "http://www.appledaily.com.tw/rss/create/kind/sec/type/11"},
-  ]
-
   # file format, override if necessary
   _parser = {
-    "format": "rss2_0",
+    "format": "rss_2_0",
     "holder": 'item',
     "extracts": {
       "title": {"key": "title"},
@@ -33,37 +23,8 @@ class Ctlr_Base_RSS (Ctlr_Base):
   }
 
   # ==============================
-  #
+  # Implementing Abstract Methods
   # ==============================
-
-  def dispatch_rss2_0(self, payload):
-    """解析 XML 格式的 RSS feed"""
-    dom = minidom.parseString(payload['response'])
-    output = []
-
-    from . import Fetcher
-    f = Fetcher()
-
-    for entry in dom.getElementsByTagName(self._parser['holder']):
-      meta = {"url_rss": payload['url']}
-      for tag in self._parser['extracts']:
-        txt = self.getTextByTagName(entry, tag)
-        if (txt):
-          key = self._parser['extracts'][tag]["key"]
-          meta[key] = txt
-
-      url = meta['url']
-      del (meta['url'])
-
-      f.queue(url, self.dispatch_article, category="article", meta = meta)
-    f.start()
-
-  def dispatch_cb(self, format):
-    if (format == 'rss2_0'):
-      return self.dispatch_rss2_0
-
-    return None
-
   def run(self):
     from . import Fetcher, db
 
@@ -87,9 +48,41 @@ class Ctlr_Base_RSS (Ctlr_Base):
       f.queue(
         rss['url'],
         self.dispatch_cb(self._parser['format']),
-        category = "rss")
+        category = self._parser['format'])
 
     f.start()
+
+  # ==============================
+  #
+  # ==============================
+
+  def dispatch_rss_2_0(self, payload):
+    """解析 XML 格式的 RSS feed"""
+    dom = minidom.parseString(payload['response'])
+    output = []
+
+    from . import Fetcher
+    f = Fetcher()
+
+    for entry in dom.getElementsByTagName(self._parser['holder']):
+      meta = {"url_rss": payload['url']}
+      for tag in self._parser['extracts']:
+        txt = self.getTextByTagName(entry, tag)
+        if (txt):
+          key = self._parser['extracts'][tag]["key"]
+          meta[key] = txt
+
+      url = meta['url']
+      del (meta['url'])
+
+      f.queue(url, self.dispatch_response, category="response", meta = meta)
+    f.start()
+
+  def dispatch_cb(self, format):
+    if (format == 'rss_2_0'):
+      return self.dispatch_rss_2_0
+
+    return None
 
   # ==============================
   # minidom related

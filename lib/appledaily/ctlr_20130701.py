@@ -1,8 +1,8 @@
 # -*- encoding: utf-8 -*-
-from .. import Ctlr_Base_RSS
+from .. import Ctlr_Base_RSS_2_0
 from bs4 import BeautifulSoup
 
-class Ctlr(Ctlr_Base_RSS):
+class Ctlr(Ctlr_Base_RSS_2_0):
   _my_host = {
     "name": "蘋果日報",
     "url": "http://www.appledaily.com.tw/",
@@ -21,7 +21,6 @@ class Ctlr(Ctlr_Base_RSS):
     if wrapper is None: return None
 
     title = wrapper.find(attrs={"class": 'mpatc'}).header
-
     if (title and title.get_text()):
       payload['title'] = title.get_text()
 

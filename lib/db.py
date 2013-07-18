@@ -12,8 +12,8 @@ class DB:
    - article
   """
 
-  # 當待寫入 row 到達 _min_row 時才寫入
-  min_buffered_rows = 50
+  # 當待寫入 row 到達 _min_row 時才寫入, default = 50
+  min_buffered_rows = 1
 
   # 測試模式，禁止寫入 DB
   ignore_db_write = False
@@ -102,8 +102,8 @@ class DB:
 
     return buff
 
-  def _update_hashtbl(self, tbl_name, data, columns = ['body', 'hash'], key = 'hash'):
-    """更新 hash table 類的表格; 會檢查 hash 是否重覆才寫入"""
+  def _update_hashtbl(self, tbl_name, data):
+    """更新 hash table 類的表格, 包含 hash (PK, bin(16) as HEX(md5)) 與 body 兩欄"""
 
     if len(data) == 0:
       # nothing to write
@@ -111,50 +111,34 @@ class DB:
 
     # escape
     tbl_name = self._conn.escape_string(tbl_name)
-    key = self._conn.escape_string(key)
-    columns = [self._conn.escape_string(x) for x in columns]
 
     self.connect()
-
-    sql = "SELECT `%s` FROM `%s` WHERE `%s` IN (%s)" % (
-      key, tbl_name, key,
-      ','.join([self._conn.escape(x[key]) for x in data])
-    )
-    self._cursor.execute(sql)
-    hashes_found = self._cursor.fetchall()
-
-    sql = 'INSERT IGNORE INTO `%s` (%s) VALUES (' % (
-      tbl_name,
-      ','.join([('`%s`' % x) for x in columns])
-    )
-    sql += ','.join([('%(' + x + ')s') for x in columns])
-    sql += ')'
-
-    self._cursor.executemany(
-      sql,
-      [x for x in data if (x[key], ) not in hashes_found]
-    )
+    sql = 'INSERT IGNORE INTO `%s` (`hash`, `body`) VALUES ' % tbl_name
+    sql += '(UNHEX(%(hash)s), %(body)s)'
+    self._cursor.executemany(sql, data)
     self._conn.commit()
 
   # ==============================
-  # Data Manip
+  # Data Manipulation
   # ==============================
 
   #
   # Fetch
   #
-  def save_fetch(self, url, response, category = None):
+  def save_fetch(self, url, response, category = 'unknown'):
     """寫入 fetches 表; 不做 unique key 檢查，僅就 category 判斷是否儲存"""
     # 不儲存的 categoruies
-    categories_ignored = [None, 'article']
+    categories_ignored = ['response', 'rss_2_0']
+    #categories_ignored = []
 
     if (category not in categories_ignored):
-      self._buff_fetch.append({"url": url, "response": response})
+      self._buff_fetch.append({"url": url, "response": response, "category": category})
 
     self.commit_fetch()
 
   def commit_fetch(self, force_commit = False):
-    sql = "INSERT INTO `fetches` (`url`, `response`) VALUES(%(url)s, %(response)s)"
+    sql = "INSERT INTO `fetches` (`url`, `response`, `category`) VALUES" \
+      "(%(url)s, %(response)s, %(category)s)"
     self._execute(sql, self._buff_fetch, force_commit)
 
   #
@@ -183,9 +167,9 @@ class DB:
     self.commit_feeds(1)
 
     sql = "INSERT IGNORE INTO `responses` " + \
-      "(`feed_id`, `url`, `response`, `response_md5`, `meta`) VALUES(" + \
+      "(`feed_id`, `url`, `body`, `body_md5`, `meta`) VALUES(" + \
         "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(url_rss)s), " + \
-        "%(url)s, %(response)s, %(response_md5)s, %(meta)s" + \
+        "%(url)s, %(response)s, UNHEX(%(response_md5)s), %(meta)s" + \
         ")"
     written = self._execute(sql, buff, force_commit)
 
@@ -202,14 +186,16 @@ class DB:
 
     # 同批抓到同樣內容，不考慮是否變動，直接忽略
     if any([x['text_md5'] == _payload['text_md5'] and x['url'] == _payload['md5'] for x in buff]):
-      return
+      pass
+    else:
 
-    # deep copy so that we don't mess up the original payload
-    payload = deepcopy(_payload)
-    payload["meta"] = dumps(payload['meta'])
-    payload["pub_ts"] = datetime.fromtimestamp(payload["pub_ts"]).isoformat()
+      # deep copy so that we don't mess up the original payload
+      payload = deepcopy(_payload)
+      payload["meta"] = dumps(payload['meta'])
+      payload["pub_ts"] = datetime.fromtimestamp(payload["pub_ts"]).isoformat()
 
-    buff.append(payload)
+      buff.append(payload)
+
     self.commit_articles()
 
   def commit_articles(self, force_commit = 0):
@@ -231,14 +217,14 @@ class DB:
     # do the insert
     sql = "INSERT INTO `articles` (" \
         "`pub_ts`, `created_on`, `feed_id`, `ctlr_id`, `url`, `title`, " \
-        "`meta`, `html_id`, `text_id`" \
+        "`meta`, `html_hash`, `text_hash`" \
       ") VALUES(" \
         "%(pub_ts)s, CURRENT_TIMESTAMP, " \
         "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(url_rss)s), " \
         "(SELECT `ctlr_id` FROM `ctlrs` WHERE `classname` = %(ctlr_classname)s), " \
         "%(url)s, %(title)s, %(meta)s, " \
-        "(SELECT `html_id` FROM `article_htmls` WHERE `hash` = %(html_md5)s), " \
-        "(SELECT `text_id` FROM `article_texts` WHERE `hash` = %(text_md5)s)" \
+        "UNHEX(%(html_md5)s), " \
+        "UNHEX(%(text_md5)s)" \
       ") ON DUPLICATE KEY UPDATE last_seen_on = CURRENT_TIMESTAMP"
 
     written = self._execute(sql, self._buff_articles, force_commit)
@@ -397,13 +383,6 @@ class DB:
 
   def flush(self):
     self.commit_ctlr_feed(1)
-
-    # called from above
-    #self.commit_feeds(1)
-    #self.commit_ctlrs(1)
-    # called from commit_feeds()
-    #self.commit_hosts(1)
-
     self.commit_fetch(1)
     self.commit_responses(1)
     self.commit_articles(1)

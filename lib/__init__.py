@@ -2,7 +2,7 @@
 import json
 from os.path import dirname, join
 
-_filenames = ['db', 'timings']
+_filenames = ['db', 'fetcher', 'timings']
 conf = {}
 
 for _filename in _filenames:
@@ -10,10 +10,10 @@ for _filename in _filenames:
     conf[_filename] = json.load(fp)
 
 # Class aliases
-import fetcher, ctlr_base, ctlr_base_rss, db
+import fetcher, ctlr_base, ctlr_base_rss_2_0, db
 
 Fetcher = fetcher.Fetcher
 Ctlr_Base = ctlr_base.Ctlr_Base
-Ctlr_Base_RSS = ctlr_base_rss.Ctlr_Base_RSS
+Ctlr_Base_RSS_2_0 = ctlr_base_rss_2_0.Ctlr_Base_RSS_2_0
 
 db = db.DB.forge()
