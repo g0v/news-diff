@@ -62,8 +62,13 @@ class DB:
     if (self.ignore_db_write):
       return False
 
+    rl = len(rows)
+
+    if rl == 0:
+      return False
+
     if not force_commit:
-      if len(rows) < self.min_buffered_rows:
+      if rl < self.min_buffered_rows:
         return False
 
     return True
@@ -100,6 +105,7 @@ class DB:
       if not rows: break
       buff += rows
 
+    self._cursor.close()
     return buff
 
   def _update_hashtbl(self, tbl_name, data):
@@ -168,7 +174,7 @@ class DB:
 
     sql = "INSERT IGNORE INTO `responses` " + \
       "(`feed_id`, `url`, `body`, `body_md5`, `meta`) VALUES(" + \
-        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(url_rss)s), " + \
+        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(feed_url)s), " + \
         "%(url)s, %(response)s, UNHEX(%(response_md5)s), %(meta)s" + \
         ")"
     written = self._execute(sql, buff, force_commit)
@@ -176,6 +182,24 @@ class DB:
   #
   # article
   #
+
+  def list_revisits(self):
+    """輸出需要 revisit 的新聞列表, 包含 meta 欄位
+
+    @see: Ctlr_Base.do_revisit()"""
+    from . import conf, Ctlr_Base
+
+    sql = "SELECT " \
+      "`a`.`created_on`, `a`.`last_seen_on`, `a`.`pub_ts`, `f`.`url`, `a`.`url`, `a`.`title`, `a`.`meta`, ( "\
+      "  SELECT `c`.`classname` FROM `ctlrs` c NATURAL JOIN `ctlr_feed` `cf` " \
+      "  WHERE `cf`.`feed_id` = `a`.`feed_id` ORDER BY `c`.`created_on` DESC LIMIT 1 " \
+      ") `classname` " \
+      "FROM `articles` a LEFT JOIN `feeds` f on f.`feed_id` = a.`feed_id` " \
+      'WHERE `created_on` > CURRENT_TIMESTAMP - INTERVAL %d MINUTE' % \
+      Ctlr_Base.revisit_max_min()
+
+    return [x for x in self._load_into_list(sql) \
+      if Ctlr_Base.need_revisit(x[0], x[1])]
 
   def save_article(self, _payload):
     from json import dumps
@@ -185,7 +209,7 @@ class DB:
     buff = self._buff_articles
 
     # 同批抓到同樣內容，不考慮是否變動，直接忽略
-    if any([x['text_md5'] == _payload['text_md5'] and x['url'] == _payload['md5'] for x in buff]):
+    if any([x['text_md5'] == _payload['text_md5'] and x['url'] == _payload['url'] for x in buff]):
       pass
     else:
 
@@ -199,8 +223,7 @@ class DB:
     self.commit_articles()
 
   def commit_articles(self, force_commit = 0):
-    """更新新聞內容；由於要持續更新 updated_on，因此不做快取
-    @todo: 檢查是否已有同樣內容 (url, article_id)，決定使用 update or insert"""
+    """更新新聞內容"""
     buff = self._buff_articles
 
     if (not self._will_execute(buff, force_commit)):
@@ -220,7 +243,7 @@ class DB:
         "`meta`, `html_hash`, `text_hash`" \
       ") VALUES(" \
         "%(pub_ts)s, CURRENT_TIMESTAMP, " \
-        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(url_rss)s), " \
+        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(feed_url)s), " \
         "(SELECT `ctlr_id` FROM `ctlrs` WHERE `classname` = %(ctlr_classname)s), " \
         "%(url)s, %(title)s, %(meta)s, " \
         "UNHEX(%(html_md5)s), " \
@@ -314,14 +337,6 @@ class DB:
 
     self.commit_ctlr_feed()
 
-  def save_ctlr_feed(self, pair):
-    buff = self._buff_ctlr_feed
-
-    if (not pair in buff):
-      buff.append(pair)
-
-    self.commit_ctlr_feed()
-
   def commit_ctlrs(self, force_commit = 0):
     buff = self._buff_ctlrs
     cache = self._cache_ctlr_classnames
@@ -329,14 +344,22 @@ class DB:
     if (not self._will_execute(buff, force_commit)):
       return
 
-    sql = "INSERT IGNORE INTO `ctlrs` (`classname`" \
-      ") VALUES (%(classname)s)"
+    sql = "INSERT IGNORE INTO `ctlrs` (`classname`, `created_on`" \
+      ") VALUES (%(classname)s, %(created_on)s)"
     written = self._execute(sql, buff, force_commit)
 
     # Update cache
     cache[:] = list(set(
       cache +
       map(lambda x: (x['classname'], ), written)))
+
+  def save_ctlr_feed(self, pair):
+    buff = self._buff_ctlr_feed
+
+    if (not pair in buff):
+      buff.append(pair)
+
+    self.commit_ctlr_feed()
 
   def commit_ctlr_feed(self, force_commit = 0):
     buff = self._buff_ctlr_feed
@@ -364,9 +387,10 @@ class DB:
   # Connection
   # ==============================
   def connect(self, server = 'default'):
+    import MySQLdb
+    from MySQLdb.cursors import SSCursor
+
     if (not (self._conn and self._conn.open)):
-      import MySQLdb
-      from MySQLdb.cursors import SSCursor
       from . import conf
 
       dbconf = conf['db'][server]
@@ -378,7 +402,7 @@ class DB:
         passwd=dbconf['passwd'],
         charset='utf8')
 
-      # todo: 若 conn 未被重設, 需要 close 舊 cursor ?
+    if (self._cursor is None or self._cursor.connection is None):
       self._cursor = self._conn.cursor(cursorclass=SSCursor)
 
   def flush(self):

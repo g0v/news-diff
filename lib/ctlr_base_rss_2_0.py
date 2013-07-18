@@ -26,9 +26,9 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
   # Implementing Abstract Methods
   # ==============================
   def run(self):
-    from . import Fetcher, db
+    Ctlr_Base.run(self)
 
-    db.save_host(self._my_host)
+    from . import Fetcher, db
 
     f = Fetcher()
     for rss in self._my_feeds:
@@ -38,16 +38,17 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
       if ('host_url' not in rss):
         rss['host_url'] = self._my_host['url']
 
-      db.save_ctlr({"classname": str(self.__class__)})
       db.save_feed(rss)
       db.save_ctlr_feed({
         'url': rss['url'],
         'classname': str(self.__class__)
       })
 
+      print('Fetching from feed "%s"' % rss['url'])
+
       f.queue(
         rss['url'],
-        self.dispatch_cb(self._parser['format']),
+        self.dispatch_rss_2_0,
         category = self._parser['format'])
 
     f.start()
@@ -57,7 +58,11 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
   # ==============================
 
   def dispatch_rss_2_0(self, payload):
-    """解析 XML 格式的 RSS feed"""
+    """解析 XML 格式的 RSS feed, 打包 meta 轉送給 fetcher 之格式為 {
+      "feed_url": '',
+      "title": '',
+      "pub_date": ''
+    }"""
     dom = minidom.parseString(payload['response'])
     output = []
 
@@ -65,7 +70,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
     f = Fetcher()
 
     for entry in dom.getElementsByTagName(self._parser['holder']):
-      meta = {"url_rss": payload['url']}
+      meta = {"feed_url": payload['url']}
       for tag in self._parser['extracts']:
         txt = self.getTextByTagName(entry, tag)
         if (txt):

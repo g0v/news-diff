@@ -2,7 +2,7 @@
 import json
 from os.path import dirname, join
 
-_filenames = ['db', 'fetcher', 'timings']
+_filenames = ['db', 'fetcher']
 conf = {}
 
 for _filename in _filenames:

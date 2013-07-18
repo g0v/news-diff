@@ -1,19 +1,13 @@
 # -*- encoding:utf-8 -*-
 
+import importlib
+
 class Ctlr_Base:
   """
   抓取並解析單篇文章的基底類別；
   針對各種型態的新聞列表 (eg. RSS, email)，需各自實作繼承用類別
   """
-  # ==============================
-  # Configs for Implementing Ctlr
-  # ==============================
 
-  # Ctlr 生效時間
-  _date_online = 0
-
-  # Ctlr 失效時間
-  _date_expire = None
 
   # ==============================
   # Configs for Base Ctlrs
@@ -30,13 +24,30 @@ class Ctlr_Base:
   ]
 
   # ==============================
-  # Abstract Methods
+  # Methods for Override
   # ==============================
 
   def run(self):
-    """在子類別中覆蓋此函式, 並將抓出的文章內容以 payload
+    """在子類別中擴充此函式, 並將抓出的文章內容以 payload
     型式傳至 dispatch_article """
-    pass
+    from . import db
+    from datetime import datetime
+
+    ctlr_sig = {"classname": str(self.__class__)}
+    if self._created_on:
+      ctlr_sig['created_on'] = self.to_date(self._created_on)
+    else:
+      ctlr_sig['created_on'] = datetime.utcnow()
+
+    db.save_host(self._my_host)
+    db.save_ctlr(ctlr_sig)
+
+  # ==============================
+  # Ctlr Configs & Overrides
+  # ==============================
+
+  # Ctlr 生效時間
+  _created_on = None
 
   def parse_response(self, payload):
     """解析 fetcher 抓回之 response
@@ -50,20 +61,94 @@ class Ctlr_Base:
     若解析失敗則回傳 False，由 dispatch_response 儲存
     """
     pass
+
   # ==============================
-  #
+  # Revisit
   # ==============================
 
-  def __init__(self):
-    # @todo : date values
-    pass
+  @staticmethod
+  def revisit_tbl():
+    return {
+        #30: 0,
+        240: 30,
+        1440: 120,
+        10080: 1440,
+        43200: 10080
+      }
 
+  @staticmethod
+  def revisit_max_min():
+    return max(Ctlr_Base.revisit_tbl().keys())
+
+  @staticmethod
+  def need_revisit(created_on, last_seen_on):
+    from datetime import datetime
+    import math
+
+    tbl = Ctlr_Base.revisit_tbl()
+    now = datetime.utcnow()
+    article_age = math.floor((now - created_on).total_seconds() / 60)
+    visit_age = math.ceil((now - last_seen_on).total_seconds() / 60)
+
+    tmp = filter(lambda(x): x > article_age, tbl.keys())
+
+    if (len(tmp) == 0):
+      #expired, should be filtered by DB
+      return False
+
+    interval = tbl[min(tmp)]
+    return visit_age >= interval
+
+  @staticmethod
+  def do_revisit():
+    """重下載必要的新聞，仿造 Base Ctlr :: dispatch_rss_2_0 meta
+    並轉由 dispatch_response 處理
+
+    @see db.list_revisits()"""
+
+    from . import Fetcher, db
+    import json
+
+    f = Fetcher()
+    ctlr_cache = {}
+    revisit_list = db.list_revisits()
+
+    print("Revisiting %d articles" % len(revisit_list))
+
+    for x in revisit_list:
+      if (x[7] not in ctlr_cache):
+        (ns, cn) = x[7].rsplit('.', 1)
+        module = importlib.import_module(ns)
+        ctlr_cache[x[7]] = getattr(module, cn)()
+
+      ctlr = ctlr_cache[x[7]]
+      meta = json.loads(x[6])
+
+      meta['feed_url'] = x[3]
+      meta['pub_date'] = Ctlr_Base.to_timestamp(x[2])
+      meta['title'] = x[5]
+
+      f.queue(x[4], ctlr.dispatch_response, category="revisit", meta = meta)
+
+    f.start()
+
+  @staticmethod
+  def do_fetch(ctlr_list):
+    for pkg in ctlr_list:
+      module = importlib.import_module('lib.%s' % pkg)
+
+      for ctlr in module.Ctlrs:
+        ctlr().run()
+
+  # ==============================
+  # Procedural
+  # ==============================
   def _decorate_article(self, article):
       del article['response']
 
       Ctlr_Base.move_out_of_meta(article, 'title')
 
-      article['meta']["status"] = "article"
+      article["status"] = "article"
       article["text_md5"] = Ctlr_Base.md5(article['text'].encode('utf-8'))
       article["html_md5"] = Ctlr_Base.md5(article['html'].encode('utf-8'))
       article["ctlr_classname"] = str(self.__class__)
@@ -71,9 +156,16 @@ class Ctlr_Base:
 
   def dispatch_response(self, payload):
     """
-    處理單則新聞 response 的 callback
+    處理 fetcher 傳回之資料，調用 parse_article 解析其內容並儲存。
 
-    對 payload 進行前處理，調用 parse_article 解析其內容，並儲存輸出結果。
+    輸入 payload 格式為 {
+      'response': 'RESPONSE_BODY',
+      'meta': {
+        'feed_url': '',
+        'pub_date': 'str'
+      }
+    }
+
     """
     from . import db
 
@@ -82,7 +174,10 @@ class Ctlr_Base:
     except KeyError: pass
 
     # Keep in meta so it's passed to content.meta
-    payload['url_rss'] = payload['meta']['url_rss']
+    # payload['feed_url'] = payload['meta']['feed_url']
+    #
+    # Don't keep it, track feed_id instead
+    self.move_out_of_meta(payload, 'feed_url')
 
     article = self.parse_response(payload)
 
@@ -94,22 +189,9 @@ class Ctlr_Base:
       payload["response_md5"] = Ctlr_Base.md5(payload['response'])
       db.save_response(payload)
 
-  @staticmethod
   def dispatch_catchup(self, payload):
-    """處理前次解析失敗的資料"""
+    """處理 responses 中解析失敗的資料"""
     raise Exception('Not Implemented, yet')
-
-  @staticmethod
-  def dispatch_revisit(self, payload):
-    """處理 revisit 取得之資料"""
-
-    article = self.parse_response(payload)
-    if not article:
-      payload["response_md5"] = Ctlr_Base.md5(payload['response'])
-      return db.save_response(payload)
-
-    self._decorate_article(article)
-    db.save_revisit(article)
 
   # ==============================
   # Utilities
@@ -140,11 +222,13 @@ class Ctlr_Base:
     from dateutil import parser
     from datetime import datetime
 
-    if type(value) is int:
+    mytype = type(value)
+
+    if mytype is int or mytype is float:
       # interpret as timestamp, utc
       return datetime(value)
 
-    if type(value) is datetime:
+    if mytype is datetime:
       return value
 
     dt = parser.parse(value)
@@ -152,5 +236,9 @@ class Ctlr_Base:
 
   @staticmethod
   def to_timestamp(value):
+    mytype = type(value)
+    if mytype is int or mytype is float:
+      return value
+
     import time
     return time.mktime(Ctlr_Base.to_date(value).utctimetuple())

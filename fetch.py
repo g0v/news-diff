@@ -2,21 +2,16 @@
 #-*- encoding:utf-8 -*-
 
 import lib
-#import proc from lib
-import importlib
 
-# Fetch RSS
-ctlr_pkg_list = [
+# RSS-based Fetches
+ctlr_list = [
   'appledaily'
 ]
 
-if True:
-  for pkg in ctlr_pkg_list:
-    ns_tmp = importlib.import_module('lib.%s' % pkg)
-
-    for ctlr in ns_tmp.Ctlrs:
-      ctlr().run()
+lib.Ctlr_Base.do_fetch(ctlr_list)
 
 # Revisits
+lib.Ctlr_Base.do_revisit()
 
+# Cleanup & Writeback
 lib.db.disconnect()

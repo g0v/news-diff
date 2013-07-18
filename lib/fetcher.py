@@ -25,7 +25,7 @@ class Worker(Thread):
         response = 'error ' + unicode(e)
 
       proc['response'] = response
-      proc['meta']['status'] = "response"
+      proc['status'] = "response"
 
       self.cond.acquire()
       self.output.append(proc)
