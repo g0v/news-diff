@@ -4,10 +4,10 @@ News-Diff
 
 REQUIREMENTS
 ------------------
-python-dateutil
-BeautySoup4
-lxml
-mysql-python
+* python-dateutil
+* BeautySoup4
+* lxml
+* mysql-python
 
 
 LICENSE
