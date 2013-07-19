@@ -5,8 +5,8 @@ import lib
 
 # RSS-based Fetches
 ctlr_list = [
-  #'appledaily',
-  #'chinatimes',
+  'appledaily',
+  'chinatimes',
   'libertytimes',
 ]
 
