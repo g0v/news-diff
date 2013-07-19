@@ -8,3 +8,8 @@ python-dateutil
 BeautySoup4
 lxml
 mysql-python
+
+
+LICENSE
+------------------
+MIT
