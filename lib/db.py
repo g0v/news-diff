@@ -13,7 +13,7 @@ class DB:
   """
 
   # 當待寫入 row 到達 _min_row 時才寫入, default = 50
-  min_buffered_rows = 1
+  min_buffered_rows = 50
 
   # 測試模式，禁止寫入 DB
   ignore_db_write = False
@@ -134,7 +134,7 @@ class DB:
   def save_fetch(self, url, response, category = 'unknown'):
     """寫入 fetches 表; 不做 unique key 檢查，僅就 category 判斷是否儲存"""
     # 不儲存的 categoruies
-    categories_ignored = ['response', 'rss_2_0']
+    categories_ignored = ['response', 'revisit', 'rss_2_0']
     #categories_ignored = []
 
     if (category not in categories_ignored):

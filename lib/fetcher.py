@@ -10,6 +10,27 @@ class Worker(Thread):
     self.pool = pool
     self.output = output
 
+  def hit_portal(self, proc):
+    import re
+    ptrn = re.compile("\.feedsportal\.com")
+
+    if (ptrn.search(proc['url'])):
+      # feedsportal, get real url
+      from lxml.html import fromstring
+      try:
+        html = fromstring(proc['response'])
+        proc['url'] = html.cssselect('a')[0].attrib['href']
+      except Exception:
+        print('** Portal error, proc :')
+        print(proc)
+
+      del proc['response']
+
+      self.pool.put(proc)
+      return True
+
+    return False
+
   def run(self):
     self.say('started')
     while True:
@@ -19,18 +40,26 @@ class Worker(Thread):
         break
 
       try:
-        self.say('fetching %s' % proc['url'])
-        response = urllib.urlopen(proc['url']).read()
+        self.say('fetching from %s' % proc['url'])
+        uo = urllib.urlopen(proc['url'])
+        response = uo.read()
+        proc['url'] = uo.url
       except Exception as e:
         response = 'error ' + unicode(e)
 
       proc['response'] = response
       proc['status'] = "response"
 
+      # begin lock
       self.cond.acquire()
-      self.output.append(proc)
+
+      if (not self.hit_portal(proc)):
+        self.output.append(proc)
+
       self.pool.task_done()
       self.cond.release()
+      # end lock
+      #
     self.say('terminated')
 
   def say(self, msg):

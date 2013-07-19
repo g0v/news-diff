@@ -1,3 +1,8 @@
-import ctlr_20130701
+# -*- encoding: utf-8 -*-
+#
+# http://www.chinatimes.com/syndication/rss
+#
 
-Ctlrs = [ctlr_20130701.Ctlr]
+import ctlr_20130719
+
+Ctlrs = [ctlr_20130719.Ctlr, ctlr_20130719.Ctlr2]

@@ -67,6 +67,8 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
     output = []
 
     from . import Fetcher
+    import urllib
+
     f = Fetcher()
 
     for entry in dom.getElementsByTagName(self._parser['holder']):
@@ -77,8 +79,15 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
           key = self._parser['extracts'][tag]["key"]
           meta[key] = txt
 
-      url = meta['url']
+      url = meta['url'].encode('utf-8')
       del (meta['url'])
+
+      # 檢查 url 是否轉碼妥善 (urlencode)
+      if (any(map(lambda(x): x > 127, [ord(x) for x in url]))):
+        if (url.startswith('http://') or url.startswith('https://')):
+          url = url[:7] + urllib.quote(url[7:])
+        else:
+          url = urllib.quote(url)
 
       f.queue(url, self.dispatch_response, category="response", meta = meta)
     f.start()
@@ -90,7 +99,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
     return None
 
   # ==============================
-  # minidom related
+  # minidom
   # ==============================
 
   def getTextByTagName(self, node, tagName):

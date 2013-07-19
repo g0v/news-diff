@@ -70,10 +70,10 @@ class Ctlr_Base:
   def revisit_tbl():
     return {
         #30: 0,
-        240: 30,
-        1440: 120,
-        10080: 1440,
-        43200: 10080
+        180: 60,
+        1440: 360,
+        10080: 2880,
+        43200: 20160
       }
 
   @staticmethod
@@ -143,16 +143,6 @@ class Ctlr_Base:
   # ==============================
   # Procedural
   # ==============================
-  def _decorate_article(self, article):
-      del article['response']
-
-      Ctlr_Base.move_out_of_meta(article, 'title')
-
-      article["status"] = "article"
-      article["text_md5"] = Ctlr_Base.md5(article['text'].encode('utf-8'))
-      article["html_md5"] = Ctlr_Base.md5(article['html'].encode('utf-8'))
-      article["ctlr_classname"] = str(self.__class__)
-      return article
 
   def dispatch_response(self, payload):
     """
@@ -168,6 +158,7 @@ class Ctlr_Base:
 
     """
     from . import db
+    import lxml.html
 
     try:
       payload['pub_ts'] = Ctlr_Base.to_timestamp(payload['meta']['pub_date'])
@@ -179,6 +170,7 @@ class Ctlr_Base:
     # Don't keep it, track feed_id instead
     self.move_out_of_meta(payload, 'feed_url')
 
+    payload['html'] = lxml.html.fromstring(payload['response'])
     article = self.parse_response(payload)
 
     if article:
@@ -188,6 +180,39 @@ class Ctlr_Base:
     else:
       payload["response_md5"] = Ctlr_Base.md5(payload['response'])
       db.save_response(payload)
+
+  def _decorate_article(self, article):
+    """在 parse_response 後執行"""
+
+    # html post-process
+    import re
+    from lxml.html import tostring, fromstring
+    from bs4 import BeautifulSoup
+
+    #update article url with canonical url
+    canonical_url = fromstring(article['response']).cssselect('link[rel=canonical]')
+    if (len(canonical_url) > 0):
+      article['url'] = canonical_url[0].attrib['href']
+
+    #remove unwanted tags
+    self.css_sel_drop_tree(article['content'], ['script'])
+
+    #prettify html with BeautifulSoup
+    article['content'] = BeautifulSoup(tostring(article['content'])).body.next
+
+    article["status"] = "article"
+    article['text'] = self.squeeze_string(article['content'].text)
+    article["text_md5"] = Ctlr_Base.md5(article['text'].encode('utf-8'))
+    article['html'] = self.squeeze_string(unicode(article['content']))
+    article["html_md5"] = Ctlr_Base.md5(article['html'].encode('utf-8'))
+    article["ctlr_classname"] = str(self.__class__)
+
+    Ctlr_Base.move_out_of_meta(article, 'title')
+
+    del article['response']
+    del article['content']
+
+    return article
 
   def dispatch_catchup(self, payload):
     """處理 responses 中解析失敗的資料"""
@@ -242,3 +267,21 @@ class Ctlr_Base:
 
     import time
     return time.mktime(Ctlr_Base.to_date(value).utctimetuple())
+
+  @staticmethod
+  def squeeze_string(input):
+    import re
+    output = re.sub('\r', '\n', input)
+    output = re.sub('\n+', '\n', output)
+    output = re.sub('\s+', ' ', output)
+    return output.strip()
+
+  # ==============================
+  #
+  # ==============================
+
+  @staticmethod
+  def css_sel_drop_tree(element, selector_list):
+    """for lxml Elements"""
+    for x in element.cssselect(", ".join(selector_list)):
+      x.drop_tree()
