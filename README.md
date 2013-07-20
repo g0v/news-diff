@@ -5,9 +5,10 @@ News-Diff
 REQUIREMENTS
 ------------------
 * python-dateutil
-* BeautySoup4
+* BeautifulSoup4
 * lxml
 * mysql-python
+* cssselect
 
 
 LICENSE

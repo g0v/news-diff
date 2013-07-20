@@ -2,127 +2,75 @@
 from copy import deepcopy
 
 class DB:
-  """提供資料庫操作之 singleton，透過 DB.forge() 取得 _instance
-
-  包含下列資料：
+  """提供資料庫操作，管理下列資料表：
    - fetch: 處理透過 fetcher 抓下的資料，轉存至 fetches 表
    - feed: 對應至所有資料來源 (eg, RSS, web page)，在 article 中作為 FK
    - ctlr: 對應至所有被調用過的 ctlr，在 article 中作為 FK
    - response
    - article
+
+  每個 thread 需生成自身的 db instance；快取與一致性問題交由資料庫處理
   """
-
-  # 當待寫入 row 到達 _min_row 時才寫入, default = 50
-  min_buffered_rows = 50
-
+  
   # 測試模式，禁止寫入 DB
   ignore_db_write = False
 
-  # ==============================
-  # Singleton
-  # ==============================
-  _instance = None
-
-  def __init__(self):
+  def __init__(self, server = 'default'):
     self._conn = None
-    self._cursor = None
-    self.connect()
+    self._server = server
 
-    # class variables
+  def conn(self):
+    import MySQLdb
+    
+    if (not (self._conn and self._conn.open)):
+      from . import conf
 
-    self._buff_hosts = []
-    self.update_host_cache ()
+      dbconf = conf['db'][self._server]
 
-    self._buff_feeds = []
-    self.update_feed_cache()
+      self._conn = MySQLdb.connect(
+        host=dbconf['host'],
+        db=dbconf['db'],
+        user=dbconf['user'],
+        passwd=dbconf['passwd'],
+        charset='utf8')
 
-    self._buff_ctlrs = []
-    self._buff_ctlr_feed = []
-    self.update_ctlr_cache()
+    return self._conn
 
-    self._buff_fetch = []
+  def cursor(self, cursorclass = None):
+    conn = self.conn()
 
-    self._buff_responses = []
+    if cursorclass:
+      return conn.cursor(cursorclass=cursorclass)
 
-    self._buff_articles = []
-    self._buff_article_texts = []
-    self._buff_article_htmls = []
+    return conn.cursor()
+  
+  def execute(self, sql, data):
+    conn = self.conn()
+    cursor = self.cursor()
 
-  @classmethod
-  def forge(self):
-    if self._instance is None:
-      self._instance = DB()
-    return self._instance
+    if type(data) is dict:
+      cursor.execute(sql, data)
+    else:
+      curosr.executemany(sql, data)
 
-  # ==============================
-  # Data Manip Utils
-  # ==============================
+    conn.commit()
+    curser.close()
 
-  def _will_execute(self, rows, force_commit= False):
-    if (self.ignore_db_write):
-      return False
+  def query(self, sql):
+    from MySQLdb.cursors import SSCursor
 
-    rl = len(rows)
-
-    if rl == 0:
-      return False
-
-    if not force_commit:
-      if rl < self.min_buffered_rows:
-        return False
-
-    return True
-
-  def _execute(self, sql, rows, force_commit = False):
-    """將 rows (list of dict) 套用至 sql，用於寫入資料。
-    若需要寫入，則清空 rows 並將其中資料回傳"""
-
-    if (not self._will_execute(rows, force_commit)):
-      return []
-
-    _rows = deepcopy(rows)
-    rows[:] = []
-
-    try:
-      self.connect()
-      self._cursor.executemany(sql, _rows)
-      self._conn.commit()
-    except Exception as e:
-      print(self._cursor._last_executed)
-      print('An error has occured: ')
-      print(str(type(e)) + ': ' + str(e))
-
-    return _rows
-
-  def _load_into_list(self, sql):
-    """取出資料表內容為 list(tuple)"""
-    self.connect()
-    self._cursor.execute(sql)
+    cursor = self.cursor(cursorclass=SSCursor)
+    cursor.execute(sql)
 
     buff = []
     while True:
-      rows = self._cursor.fetchmany(size=10000)
+      rows = cursor.fetchmany(size=10000)
       if not rows: break
       buff += rows
 
-    self._cursor.close()
+    cursor.close()
     return buff
 
-  def _update_hashtbl(self, tbl_name, data):
-    """更新 hash table 類的表格, 包含 hash (PK, bin(16) as HEX(md5)) 與 body 兩欄"""
-
-    if len(data) == 0:
-      # nothing to write
-      return
-
-    # escape
-    tbl_name = self._conn.escape_string(tbl_name)
-
-    self.connect()
-    sql = 'INSERT IGNORE INTO `%s` (`hash`, `body`) VALUES ' % tbl_name
-    sql += '(UNHEX(%(hash)s), %(body)s)'
-    self._cursor.executemany(sql, data)
-    self._conn.commit()
 
   # ==============================
   # Data Manipulation
@@ -137,15 +85,15 @@ class DB:
     categories_ignored = ['response', 'revisit', 'rss_2_0']
     #categories_ignored = []
 
-    if (category not in categories_ignored):
-      self._buff_fetch.append({"url": url, "response": response, "category": category})
+    if (category in categories_ignored):
+      return
 
-    self.commit_fetch()
-
-  def commit_fetch(self, force_commit = False):
     sql = "INSERT INTO `fetches` (`url`, `response`, `category`) VALUES" \
       "(%(url)s, %(response)s, %(category)s)"
-    self._execute(sql, self._buff_fetch, force_commit)
+    
+    cursor = self.cursor()
+    cursor.execute(sql, {"url": url, "response": response, "category": category})
+    cursor.close()
 
   #
   # 僅在 parse 失敗時寫入，因此積極重寫
@@ -382,39 +330,3 @@ class DB:
   def update_ctlr_cache(self):
     sql = 'SELECT `classname` FROM `ctlrs`'
     self._cache_ctlr_classnames = self._load_into_list(sql)
-
-  # ==============================
-  # Connection
-  # ==============================
-  def connect(self, server = 'default'):
-    import MySQLdb
-    from MySQLdb.cursors import SSCursor
-
-    if (not (self._conn and self._conn.open)):
-      from . import conf
-
-      dbconf = conf['db'][server]
-
-      self._conn = MySQLdb.connect(
-        host=dbconf['host'],
-        db=dbconf['db'],
-        user=dbconf['user'],
-        passwd=dbconf['passwd'],
-        charset='utf8')
-
-    if (self._cursor is None or self._cursor.connection is None):
-      self._cursor = self._conn.cursor(cursorclass=SSCursor)
-
-  def flush(self):
-    self.commit_ctlr_feed(1)
-    self.commit_fetch(1)
-    self.commit_responses(1)
-    self.commit_articles(1)
-
-  def disconnect(self):
-    self.flush()
-
-    self._cursor.close()
-    self._cursor = None
-    self._conn.close()
-    self._conn = None
