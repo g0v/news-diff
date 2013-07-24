@@ -51,93 +51,17 @@ class Ctlr_Base:
   def parse_response(self, payload, pool, db):
     """解析 fetcher 抓回之 response
 
-    輸出之 article 需包含下列欄位：{
+    payload 之輸入為：{
       'title': '[TITLE]'
-      'text': '[TEXT]'
-      'html': '[HTML]',
+      'meta': {}
     }
-
-    若解析失敗則回傳 False，由 dispatch_response 儲存
+    輸出為：{
+      'content': 包含內文之 lxml tree
+    }
+    若解析失敗則回傳 False
+    由 dispatch_response 儲存資料
     """
     pass
-
-  # ==============================
-  # Revisit
-  # ==============================
-
-  @staticmethod
-  def revisit_tbl():
-    return {
-        #30: 0,
-        180: 60,
-        1440: 360,
-        10080: 2880,
-        43200: 20160
-      }
-
-  @staticmethod
-  def revisit_max_min():
-    return max(Ctlr_Base.revisit_tbl().keys())
-
-  @staticmethod
-  def need_revisit(created_on, last_seen_on):
-    from datetime import datetime
-    import math
-
-    tbl = Ctlr_Base.revisit_tbl()
-    now = datetime.utcnow()
-    article_age = math.floor((now - created_on).total_seconds() / 60)
-    visit_age = math.ceil((now - last_seen_on).total_seconds() / 60)
-
-    tmp = filter(lambda(x): x > article_age, tbl.keys())
-
-    if (len(tmp) == 0):
-      #expired, should be filtered by DB
-      return False
-
-    interval = tbl[min(tmp)]
-    return visit_age >= interval
-
-  @staticmethod
-  def do_revisit():
-    """重下載必要的新聞，仿造 Base Ctlr :: dispatch_rss_2_0 meta
-    並轉由 dispatch_response 處理
-
-    @see db.list_revisits()"""
-
-    from . import Fetcher, db
-    import json
-
-    f = Fetcher()
-    ctlr_cache = {}
-    revisit_list = db.list_revisits()
-
-    print("Revisiting %d articles" % len(revisit_list))
-
-    for x in revisit_list:
-      if (x[7] not in ctlr_cache):
-        (ns, cn) = x[7].rsplit('.', 1)
-        module = importlib.import_module(ns)
-        ctlr_cache[x[7]] = getattr(module, cn)()
-
-      ctlr = ctlr_cache[x[7]]
-      meta = json.loads(x[6])
-
-      meta['feed_url'] = x[3]
-      meta['pub_date'] = Ctlr_Base.to_timestamp(x[2])
-      meta['title'] = x[5]
-
-      f.queue(x[4], ctlr.dispatch_response, category="revisit", meta = meta)
-
-    f.start()
-
-  @staticmethod
-  def do_fetch(ctlr_list):
-    for pkg in ctlr_list:
-      module = importlib.import_module('lib.%s' % pkg)
-
-      for ctlr in module.Ctlrs:
-        ctlr().run()
 
   # ==============================
   # Procedural
@@ -145,7 +69,7 @@ class Ctlr_Base:
 
   def dispatch_response(self, payload, pool, db):
     """
-    處理 fetcher 傳回之資料，調用 parse_article 解析其內容並儲存。
+    處理 fetcher 傳回之資料，調用 parse_response 解析其內容並儲存。
 
     輸入 payload 格式為 {
       'response': 'RESPONSE_BODY',
@@ -154,9 +78,13 @@ class Ctlr_Base:
         'pub_date': 'str'
       }
     }
+    輸出為 {
+      'html': lxml tree
+    }
 
     """
     import lxml.html
+    from . import md5
 
     try:
       payload['pub_ts'] = Ctlr_Base.to_timestamp(payload['meta']['pub_date'])
@@ -176,21 +104,21 @@ class Ctlr_Base:
       self._decorate_article(article)
       db.save_article(article)
     else:
-      payload["response_md5"] = Ctlr_Base.md5(payload['response'])
       db.save_response(payload)
 
   def _decorate_article(self, article):
-    """在 parse_response 後執行"""
+    """在 parse_response 後執行，後處理其輸出"""
 
     # html post-process
-    import re
     from lxml.html import tostring, fromstring
     from bs4 import BeautifulSoup
+    from net import normalize_url
 
     #update article url with canonical url
-    canonical_url = fromstring(article['response']).cssselect('link[rel=canonical]')
-    if (len(canonical_url) > 0):
-      article['url'] = canonical_url[0].attrib['href']
+    url_canonical = fromstring(article['response']).cssselect('link[rel=canonical]')
+
+    article['url_canonical'] = url_canonical[0].attrib['href'] \
+      if len(url_canonical) > 0 else article['url_read']
 
     #remove unwanted tags
     self.css_sel_drop_tree(article['content'], ['script'])
@@ -198,12 +126,13 @@ class Ctlr_Base:
     #prettify html with BeautifulSoup
     article['content'] = BeautifulSoup(tostring(article['content'])).body.next
 
-    article["status"] = "article"
-    article['text'] = self.squeeze_string(article['content'].text)
-    article["text_md5"] = Ctlr_Base.md5(article['text'].encode('utf-8'))
-    article['html'] = self.squeeze_string(unicode(article['content']))
-    article["html_md5"] = Ctlr_Base.md5(article['html'].encode('utf-8'))
+    article['text'] = self.pack_string(article['content'].text.encode('utf-8'))
+    article['html'] = self.pack_string(unicode(article['content']).encode('utf-8'))
     article["ctlr_classname"] = str(self.__class__)
+
+    article['url'] = normalize_url(article['url'])
+    article['url_read'] = normalize_url(article['url_read'])
+    article['url_canonical'] = normalize_url(article['url_canonical'])
 
     Ctlr_Base.move_out_of_meta(article, 'title')
 
@@ -212,18 +141,9 @@ class Ctlr_Base:
 
     return article
 
-  def dispatch_catchup(self, payload):
-    """處理 responses 中解析失敗的資料"""
-    raise Exception('Not Implemented, yet')
-
   # ==============================
   # Utilities
   # ==============================
-
-  @staticmethod
-  def md5(unicode_str):
-    from hashlib import md5
-    return md5(unicode_str).hexdigest()
 
   @staticmethod
   def move_into_meta(payload, key):
@@ -267,7 +187,7 @@ class Ctlr_Base:
     return time.mktime(Ctlr_Base.to_date(value).utctimetuple())
 
   @staticmethod
-  def squeeze_string(input):
+  def pack_string(input):
     import re
     output = re.sub('\r', '\n', input)
     output = re.sub('\n+', '\n', output)

@@ -6,8 +6,8 @@
 #
 
 # 不儲存的 categories
-# fetch_categories_ignored = ['response', 'revisit', 'rss_2_0']
-fetch_categories_ignored = []
+fetch_categories_ignored = ['response', 'revisit', 'rss_2_0']
+# fetch_categories_ignored = []
 
 from copy import deepcopy
 
@@ -57,10 +57,18 @@ class DB_Base:
     conn = self.conn()
     cursor = self.cursor()
 
-    if type(data) is dict:
-      cursor.execute(sql, data)
-    else:
-      cursor.executemany(sql, data)
+    try:
+      if type(data) is dict:
+        cursor.execute(sql, data)
+      else:
+        cursor.executemany(sql, data)
+    except Exception as e:
+      try :cursor._last_executed
+      except AttributeError:
+        raise e
+
+      print('query error: ')
+      print(cursor._last_executed)
 
     conn.commit()
     cursor.close()
@@ -81,13 +89,12 @@ class DB_Base:
     return buff
 
 
-class DB(DB_Base):
-  """管理下列資料表：
-   - fetch: 處理透過 fetcher 抓下的資料，轉存至 fetches 表
+class DB_Meta(DB_Base):
+  """管理下列 metadata ：
    - feed: 對應至所有資料來源 (eg, RSS, web page)，在 article 中作為 FK
    - ctlr: 對應至所有被調用過的 ctlr，在 article 中作為 FK
-   - response
-   - article
+   - host
+   - url
   """
 
   def __init__(self, server = 'default'):
@@ -97,128 +104,9 @@ class DB(DB_Base):
     self.update_feed_cache()
 
   #
-  # Fetch
-  #
-  def save_fetch(self, url, response, category = 'unknown'):
-    """寫入 fetches 表; 不做 unique key 檢查，僅就 category 判斷是否儲存"""
-
-    if (category in fetch_categories_ignored): return
-
-    sql = "INSERT INTO `fetches` (`url`, `response`, `category`) VALUES" \
-      "(%(url)s, %(response)s, %(category)s)"
-
-    self.execute(sql, {"url": url, "response": response, "category": category})
-
-  #
-  # 僅在 parse 失敗時寫入，因此積極重寫
-  #
-
-  def save_response(self, _payload):
-    from json import dumps
-    from datetime import datetime
-    from . import Ctlr_Base
-
-    # deep copy so that we don't mess up the original payload
-    payload = deepcopy(_payload)
-    payload["meta"] = dumps(payload['meta'])
-
-    self._buff_responses.append(payload)
-    self.commit_responses()
-
-  def commit_responses(self, force_commit = 0):
-    buff = self._buff_responses
-
-    if (not self._will_execute(buff, force_commit)):
-      return
-
-    # Update FK
-    self.commit_feeds(1)
-
-    sql = "INSERT IGNORE INTO `responses` " + \
-      "(`feed_id`, `url`, `body`, `body_md5`, `meta`) VALUES(" + \
-        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(feed_url)s), " + \
-        "%(url)s, %(response)s, UNHEX(%(response_md5)s), %(meta)s" + \
-        ")"
-    written = self._execute(sql, buff, force_commit)
-
-  #
-  # article
-  #
-
-  def list_revisits(self):
-    """輸出需要 revisit 的新聞列表, 包含 meta 欄位
-
-    @see: Ctlr_Base.do_revisit()"""
-    from . import conf, Ctlr_Base
-
-    sql = "SELECT " \
-      "`a`.`created_on`, `a`.`last_seen_on`, `a`.`pub_ts`, `f`.`url`, `a`.`url`, `a`.`title`, `a`.`meta`, ( "\
-      "  SELECT `c`.`classname` FROM `ctlrs` c NATURAL JOIN `ctlr_feed` `cf` " \
-      "  WHERE `cf`.`feed_id` = `a`.`feed_id` ORDER BY `c`.`created_on` DESC LIMIT 1 " \
-      ") `classname` " \
-      "FROM `articles` a LEFT JOIN `feeds` f on f.`feed_id` = a.`feed_id` " \
-      'WHERE `created_on` > CURRENT_TIMESTAMP - INTERVAL %d MINUTE' % \
-      Ctlr_Base.revisit_max_min()
-
-    return [x for x in self._load_into_list(sql) \
-      if Ctlr_Base.need_revisit(x[0], x[1])]
-
-  def save_article(self, _payload):
-    from json import dumps
-    from datetime import datetime
-    from . import Ctlr_Base
-
-    buff = self._buff_articles
-
-    # 同批抓到同樣內容，不考慮是否變動，直接忽略
-    if any([x['text_md5'] == _payload['text_md5'] and x['url'] == _payload['url'] for x in buff]):
-      pass
-    else:
-
-      # deep copy so that we don't mess up the original payload
-      payload = deepcopy(_payload)
-      payload["meta"] = dumps(payload['meta'])
-      payload["pub_ts"] = datetime.fromtimestamp(payload["pub_ts"]).isoformat()
-
-      buff.append(payload)
-
-    self.commit_articles()
-
-  def commit_articles(self, force_commit = 0):
-    """更新新聞內容"""
-    buff = self._buff_articles
-
-    if (not self._will_execute(buff, force_commit)):
-      return
-
-    # Update FK
-    self.commit_feeds(1)
-    self.commit_ctlrs(1)
-
-    # update article text & html
-    self._update_hashtbl('article_htmls', [{"hash": x['html_md5'], "body": x['html']} for x in buff])
-    self._update_hashtbl('article_texts', [{"hash": x['text_md5'], "body": x['text']} for x in buff])
-
-    # do the insert
-    sql = "INSERT INTO `articles` (" \
-        "`pub_ts`, `created_on`, `feed_id`, `ctlr_id`, `url`, `title`, " \
-        "`meta`, `html_hash`, `text_hash`" \
-      ") VALUES(" \
-        "%(pub_ts)s, CURRENT_TIMESTAMP, " \
-        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(feed_url)s), " \
-        "(SELECT `ctlr_id` FROM `ctlrs` WHERE `classname` = %(ctlr_classname)s), " \
-        "%(url)s, %(title)s, %(meta)s, " \
-        "UNHEX(%(html_md5)s), " \
-        "UNHEX(%(text_md5)s)" \
-      ") ON DUPLICATE KEY UPDATE last_seen_on = CURRENT_TIMESTAMP"
-
-    written = self._execute(sql, self._buff_articles, force_commit)
-
-  #
   # Host
-  # 數量有限且不多，因此使用 cache 避免重覆寫入
+  # 數量有限且使用數值 id，快取避免重覆寫入
   #
-
   def save_host(self, host):
     cache = self._cache_host_urls
     if (host['url'] in cache): return
@@ -241,8 +129,8 @@ class DB(DB_Base):
 
   #
   # feed
+  # 數量有限且使用數值 id，快取避免重覆寫入
   #
-
   def save_feed(self, source):
     cache = self._cache_feed_urls
     if (source['url'] in cache): return
@@ -265,6 +153,7 @@ class DB(DB_Base):
 
   #
   # ctlr
+  # 數量有限且使用數值 id，快取避免重覆寫入
   #
 
   def save_ctlr(self, ctlr):
@@ -296,3 +185,143 @@ class DB(DB_Base):
       ")"
 
     self.execute(sql, pair)
+
+class DB(DB_Meta):
+  """管理下列目標資料 ：
+   - fetch
+   - response
+   - article
+  """
+
+  def __init__(self, server = 'default'):
+    DB_Meta.__init__(self, server)
+
+  #
+  # Fetch
+  #
+  def save_fetch(self, url, response, category = 'unknown'):
+    """寫入 fetches 表; 不做 unique key 檢查，僅就 category 判斷是否儲存"""
+
+    if (category in fetch_categories_ignored): return
+
+    sql = "INSERT INTO `fetches` (`url`, `response`, `category`) VALUES" \
+      "(%(url)s, %(response)s, %(category)s)"
+
+    self.execute(sql, {"url": url, "response": response, "category": category})
+
+  #
+  # article
+  #
+
+  def list_revisits(self):
+    """輸出需要 revisit 的新聞列表, 包含 meta 欄位
+
+    @see: Ctlr_Base.do_revisit()"""
+    from . import conf, Ctlr_Base
+
+    sql = "SELECT " \
+      "`a`.`created_on`, `a`.`last_seen_on`, `a`.`pub_ts`, `f`.`url`, `a`.`url`, `a`.`title`, `a`.`meta`, ( "\
+      "  SELECT `c`.`classname` FROM `ctlrs` c NATURAL JOIN `ctlr_feed` `cf` " \
+      "  WHERE `cf`.`feed_id` = `a`.`feed_id` ORDER BY `c`.`created_on` DESC LIMIT 1 " \
+      ") `classname` " \
+      "FROM `articles` a LEFT JOIN `feeds` f on f.`feed_id` = a.`feed_id` " \
+      'WHERE `created_on` > CURRENT_TIMESTAMP - INTERVAL %d MINUTE' % \
+      Ctlr_Base.revisit_max_min()
+
+    return [x for x in self._load_into_list(sql) \
+      if Ctlr_Base.need_revisit(x[0], x[1])]
+
+  #
+  # Hashtbl
+  # 數量可能很大，因此不做快取
+  #
+  def save_hashtbl(self, tbl_name, data):
+    """將 data 存入列表，可以是 body, [body...] 或 [{'body':'body'}...] 的格式"""
+    from . import md5
+    from MySQLdb import escape_string
+
+    if (type(data) is str):
+      _data = {'md5': md5(data), 'body': data}
+    elif (type(data) is dict):
+      if 'md5' not in data:
+        data['md5'] = md5(data['body'])
+      _data = data
+    elif (type(data[0]) is str):
+      _data = [{'md5': md5(x), 'body': x} for x in data]
+    else:
+      _data = [{'md5': x['md5'] if 'md5' in x else md5(x['body']), 'body': x['body']} for x in data]
+
+    sql = "INSERT IGNORE INTO `%s` (`body`, `hash`) VALUES " % escape_string(tbl_name)
+    sql += "(%(body)s, UNHEX(%(md5)s))"
+
+    self.execute(sql, _data)
+
+  def save_article(self, payload):
+    """更新新聞內容"""
+    from json import dumps
+    from datetime import datetime
+    from . import md5
+
+    # deep copy so that we don't mess up the original payload
+    _payload = deepcopy(payload)
+    _payload["meta"] = dumps(payload['meta'])
+    _payload["pub_ts"] = datetime.fromtimestamp(payload["pub_ts"]).isoformat()
+
+    # hashtbl : html, text, meta
+    _payload['html_md5'] = md5(_payload['html'])
+    _payload['text_md5'] = md5(_payload['text'])
+    _payload['meta_md5'] = md5(_payload['meta'])
+
+    self.save_hashtbl('article__htmls', {
+      'md5': _payload['html_md5'], 'body':_payload['html']})
+    self.save_hashtbl('article__texts', {
+      'md5': _payload['text_md5'], 'body':_payload['text']})
+    self.save_hashtbl('article__meta', {
+      'md5': _payload['meta_md5'], 'body': _payload['meta']})
+
+    # hashtbl: url
+    _payload['url_md5'] = md5(_payload['url'])
+    _payload['url_read_md5'] = md5(_payload['url_read'])
+    _payload['url_canonical_md5'] = md5(_payload['url_canonical'])
+
+    self.save_hashtbl('article__urls', [
+      {'md5': _payload['url_md5'], 'body': _payload['url']},
+      {'md5': _payload['url_read_md5'], 'body': _payload['url_read']},
+      {'md5': _payload['url_canonical_md5'], 'body': _payload['url_canonical']},
+    ]);
+
+    # do the insert
+    sql = "INSERT INTO `articles` (" \
+        "`title`, `pub_ts`, `created_on`, " \
+        "`feed_id`, `ctlr_id`, " \
+        "`url_hash`, `url_read_hash`, `url_canonical_hash`, " \
+        "`meta_hash`, `html_hash`, `text_hash`" \
+      ") VALUES(" \
+        "%(title)s, %(pub_ts)s, CURRENT_TIMESTAMP, " \
+        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(feed_url)s), " \
+        "(SELECT `ctlr_id` FROM `ctlrs` WHERE `classname` = %(ctlr_classname)s), " \
+        "UNHEX(%(url_md5)s), UNHEX(%(url_read_md5)s), UNHEX(%(url_canonical_md5)s)," \
+        "UNHEX(%(meta_md5)s), UNHEX(%(html_md5)s), UNHEX(%(text_md5)s)" \
+      ") ON DUPLICATE KEY UPDATE last_seen_on = CURRENT_TIMESTAMP"
+
+    self.execute(sql, _payload)
+
+  #
+  # Response, 僅在 parse 失敗時寫入，因此積極重寫
+  #
+
+  def save_response(self, payload):
+    from json import dumps
+    from datetime import datetime
+    from . import Ctlr_Base
+
+    # deep copy so that we don't mess up the original payload
+    _payload = deepcopy(payload)
+    _payload["meta"] = dumps(payload['meta'])
+
+    sql = "INSERT IGNORE INTO `responses` " + \
+      "(`feed_id`, `url`, `body`, `meta`) VALUES(" + \
+        "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(feed_url)s), " + \
+        "%(url)s, %(response)s, %(meta)s" + \
+        ")"
+    self.execute(sql, _payload)

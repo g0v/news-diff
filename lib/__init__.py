@@ -23,3 +23,7 @@ def say(msg, self = None):
     hdr = "[%s]\t" % unicode(self)
 
   print("%s%s" % (hdr, msg))
+
+def md5(unicode_str):
+  from hashlib import md5
+  return md5(unicode_str).hexdigest()

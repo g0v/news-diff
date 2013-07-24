@@ -29,6 +29,7 @@ class Ctlr(Ctlr_Base_RSS_2_0):
   ]
 
   def parse_response(self, payload):
+    return False
     content = payload['html'].cssselect(".abdominis .articulum")
 
     if content is None or len(content) == 0: return None

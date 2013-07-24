@@ -4,6 +4,11 @@ portal_ptrn_list = {
 
 import urllib
 
+def normalize_url(url):
+  import re
+  url = url.rstrip('/')
+  return re.sub('^https?://', '', url)
+
 def get_portal(url):
   import re
 
