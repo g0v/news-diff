@@ -26,12 +26,11 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
   # ==============================
   # Implementing Abstract Methods
   # ==============================
-  def run(self):
-    Ctlr_Base.run(self)
+  def feed(self, pool, db):
+    from lib import say
 
-    from . import Fetcher, db
+    Ctlr_Base.feed(self, pool, db)
 
-    f = Fetcher()
     for rss in self._my_feeds:
       if ('title' not in rss):
         rss['title'] = None
@@ -45,32 +44,23 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
         'classname': str(self.__class__)
       })
 
-      print('Fetching from feed "%s"' % rss['url'])
+      say('Fetching from feed "%s"' % rss['url'], self)
 
-      f.queue(
-        rss['url'],
-        self.dispatch_rss_2_0,
-        category = self._parser['format'])
-
-    f.start()
+      pool.put(rss['url'], self.dispatch_rss_2_0, category = self._parser['format'])
 
   # ==============================
   #
   # ==============================
 
-  def dispatch_rss_2_0(self, payload):
+  def dispatch_rss_2_0(self, payload, pool, db):
     """解析 XML 格式的 RSS feed, 打包 meta 轉送給 fetcher 之格式為 {
       "feed_url": '',
       "title": '',
       "pub_date": ''
     }"""
     dom = minidom.parseString(payload['response'])
-    output = []
 
-    from . import Fetcher
     import urllib
-
-    f = Fetcher()
 
     for entry in dom.getElementsByTagName(self._parser['holder']):
       meta = {"feed_url": payload['url']}
@@ -90,14 +80,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
         else:
           url = urllib.quote(url)
 
-      f.queue(url, self.dispatch_response, category="response", meta = meta)
-    f.start()
-
-  def dispatch_cb(self, format):
-    if (format == 'rss_2_0'):
-      return self.dispatch_rss_2_0
-
-    return None
+      pool.put(url, self.dispatch_response, category="response", meta = meta)
 
   # ==============================
   # minidom

@@ -6,9 +6,10 @@ REQUIREMENTS
 ------------------
 * python-dateutil
 * BeautifulSoup4
-* lxml
-* mysql-python
 * cssselect
+
+* python-lxml
+* python-mysqldb
 
 
 LICENSE

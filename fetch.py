@@ -4,37 +4,30 @@
 # ==========================
 
 
-# RSS-based Fetches
+# CTLR-based Fetches
 ctlr_list = [
   'appledaily',
   #'chinatimes',
   #'libertytimes',
 ]
 
-import Queue
-from lib import proc, conf
+from lib import proc, conf, Queue, DB
 from threading import Condition
 
-# 在所有 thread 間共享的資料
-tshared = {
-  # 讀寫此物件所需之 lock
-  'lock': Condition(),
-  # 最近抓過的 (raw) url，若 feed 提供值重複則不抓
-  'recent_urls' :[],
-  # 本次執行抓取成功的 (raw) url，若新任務與之重複則不執行
-  'scheduled_urls': []
-}
-
-pool = Queue.Queue(0)
+jobs = Queue()
+db = DB()
 
 # lib.Ctlr_Base.do_fetch(ctlr_list)
-proc.feed_ctlr_list(pool, ctlr_list)
+proc.feed_fetch(jobs, ctlr_list, db)
 
 # Revisits
-proc.feed_revisit(pool)
+proc.feed_revisit(jobs, db)
+
+db.disconnect()
 
 # initiate worker threads
-for i in xrange(conf['fetcher']['threads']):
-  proc.Worker(pool, tshared).start()
+for i in xrange(conf['config']['threads']):
+  proc.Worker(jobs).start()
 
-pool.join()
+if (jobs.unfinished_tasks > 0):
+  jobs.join()

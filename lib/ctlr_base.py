@@ -27,13 +27,12 @@ class Ctlr_Base:
   # Methods for Override
   # ==============================
 
-  def run(self):
-    """在子類別中擴充此函式, 並將抓出的文章內容以 payload
-    型式傳至 dispatch_article """
-    from . import db
+  def feed(self, pool, db):
+    """在子類別中擴充此函式, 以將工作排程入 pool 中"""
+
     from datetime import datetime
 
-    ctlr_sig = {"classname": str(self.__class__)}
+    ctlr_sig = {"classname": unicode(self.__class__)}
     if self._created_on:
       ctlr_sig['created_on'] = self.to_date(self._created_on)
     else:
@@ -49,7 +48,7 @@ class Ctlr_Base:
   # Ctlr 生效時間
   _created_on = None
 
-  def parse_response(self, payload):
+  def parse_response(self, payload, pool, db):
     """解析 fetcher 抓回之 response
 
     輸出之 article 需包含下列欄位：{
@@ -144,7 +143,7 @@ class Ctlr_Base:
   # Procedural
   # ==============================
 
-  def dispatch_response(self, payload):
+  def dispatch_response(self, payload, pool, db):
     """
     處理 fetcher 傳回之資料，調用 parse_article 解析其內容並儲存。
 
@@ -157,7 +156,6 @@ class Ctlr_Base:
     }
 
     """
-    from . import db
     import lxml.html
 
     try:

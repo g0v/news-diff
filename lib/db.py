@@ -1,17 +1,19 @@
 # -*-encoding:utf-8 -*-
+#
+# 資料庫相關功能
+# 每個 thread 需生成自身的 db instance；快取與一致性問題由資料庫處理
+#
+#
+
+# 不儲存的 categories
+# fetch_categories_ignored = ['response', 'revisit', 'rss_2_0']
+fetch_categories_ignored = []
+
 from copy import deepcopy
 
-class DB:
-  """提供資料庫操作，管理下列資料表：
-   - fetch: 處理透過 fetcher 抓下的資料，轉存至 fetches 表
-   - feed: 對應至所有資料來源 (eg, RSS, web page)，在 article 中作為 FK
-   - ctlr: 對應至所有被調用過的 ctlr，在 article 中作為 FK
-   - response
-   - article
+class DB_Base:
+  """提供資料庫底層操作功能"""
 
-  每個 thread 需生成自身的 db instance；快取與一致性問題交由資料庫處理
-  """
-  
   # 測試模式，禁止寫入 DB
   ignore_db_write = False
 
@@ -19,9 +21,16 @@ class DB:
     self._conn = None
     self._server = server
 
+  def __del__(self):
+    self.disconnect()
+
+  def disconnect(self):
+    if (self._conn and self._conn.open):
+      self._conn.close()
+
   def conn(self):
     import MySQLdb
-    
+
     if (not (self._conn and self._conn.open)):
       from . import conf
 
@@ -43,7 +52,7 @@ class DB:
       return conn.cursor(cursorclass=cursorclass)
 
     return conn.cursor()
-  
+
   def execute(self, sql, data):
     conn = self.conn()
     cursor = self.cursor()
@@ -51,10 +60,10 @@ class DB:
     if type(data) is dict:
       cursor.execute(sql, data)
     else:
-      curosr.executemany(sql, data)
+      cursor.executemany(sql, data)
 
     conn.commit()
-    curser.close()
+    cursor.close()
 
   def query(self, sql):
     from MySQLdb.cursors import SSCursor
@@ -72,28 +81,33 @@ class DB:
     return buff
 
 
-  # ==============================
-  # Data Manipulation
-  # ==============================
+class DB(DB_Base):
+  """管理下列資料表：
+   - fetch: 處理透過 fetcher 抓下的資料，轉存至 fetches 表
+   - feed: 對應至所有資料來源 (eg, RSS, web page)，在 article 中作為 FK
+   - ctlr: 對應至所有被調用過的 ctlr，在 article 中作為 FK
+   - response
+   - article
+  """
+
+  def __init__(self, server = 'default'):
+    DB_Base.__init__(self, server)
+    self.update_host_cache()
+    self.update_ctlr_cache()
+    self.update_feed_cache()
 
   #
   # Fetch
   #
   def save_fetch(self, url, response, category = 'unknown'):
     """寫入 fetches 表; 不做 unique key 檢查，僅就 category 判斷是否儲存"""
-    # 不儲存的 categoruies
-    categories_ignored = ['response', 'revisit', 'rss_2_0']
-    #categories_ignored = []
 
-    if (category in categories_ignored):
-      return
+    if (category in fetch_categories_ignored): return
 
     sql = "INSERT INTO `fetches` (`url`, `response`, `category`) VALUES" \
       "(%(url)s, %(response)s, %(category)s)"
-    
-    cursor = self.cursor()
-    cursor.execute(sql, {"url": url, "response": response, "category": category})
-    cursor.close()
+
+    self.execute(sql, {"url": url, "response": response, "category": category})
 
   #
   # 僅在 parse 失敗時寫入，因此積極重寫
@@ -206,118 +220,74 @@ class DB:
   #
 
   def save_host(self, host):
-    buff = self._buff_hosts
     cache = self._cache_host_urls
+    if (host['url'] in cache): return
 
-    if ((host['url'],) not in cache):
-      if (not any([x['url'] == host['url'] for x in buff])):
-        buff.append(host)
+    # that aggressive !?
+    self.update_host_cache()
+    if (host['url'] in cache): return
 
-    self.commit_hosts()
+    sql = "INSERT IGNORE INTO `hosts` (`name`, `url`) " \
+      "VALUES (%(name)s, %(url)s)"
 
-  def commit_hosts(self, force_commit = 0):
-    buff = self._buff_hosts
-    cache = self._cache_host_urls
-
-    if (not self._will_execute(buff, force_commit)):
-      return
-
-    sql = "INSERT IGNORE INTO `hosts` (`name`, `url`" \
-      ") VALUES (%(name)s, %(url)s)"
-    written = self._execute(sql, buff, force_commit)
-
-    # Update cache
-    cache[:] = list(set(
-      cache +
-      map(lambda x: (x['url'], ), written)))
+    self.execute(sql, host)
+    cache.add(host['url'])
 
   def update_host_cache(self):
+    try: self._cache_host_urls
+    except AttributeError: self._cache_host_urls = set()
     sql = 'SELECT `url` FROM `hosts`'
-    self._cache_host_urls = self._load_into_list(sql)
+    self._cache_host_urls.update([x[0] for x in self.query(sql)])
 
   #
   # feed
   #
 
   def save_feed(self, source):
-    buff = self._buff_feeds
     cache = self._cache_feed_urls
+    if (source['url'] in cache): return
 
-    if ((source['url'],) not in cache):
-      if (not any([x['url'] == source['url'] for x in buff])):
-        buff.append(source)
-
-    self.commit_feeds()
-
-  def commit_feeds(self, force_commit = 0):
-    buff = self._buff_feeds
-    cache = self._cache_feed_urls
-
-    if (not self._will_execute(buff, force_commit)):
-      return
-    self.commit_hosts(1)
+    self.update_feed_cache()
+    if (source['url'] in cache): return
 
     sql = "INSERT IGNORE INTO `feeds` (`url`, `title`, `host_id`" \
       ") VALUES (%(url)s, %(title)s, " \
       "(SELECT `host_id` FROM `hosts` WHERE `url` = %(host_url)s))"
-    written = self._execute(sql, buff, force_commit)
 
-    # Update cache
-    cache[:] = list(set(
-      cache +
-      map(lambda x: (x['url'], ), written)))
+    self.execute(sql, source)
+    cache.add(source['url'])
 
   def update_feed_cache(self):
+    try: self._cache_feed_urls
+    except AttributeError: self._cache_feed_urls = set()
     sql = 'SELECT `url` FROM `feeds`'
-    self._cache_feed_urls = self._load_into_list(sql)
+    self._cache_feed_urls.update([x[0] for x in self.query(sql)])
 
   #
   # ctlr
   #
 
   def save_ctlr(self, ctlr):
-    buff = self._buff_ctlrs
     cache = self._cache_ctlr_classnames
+    if (ctlr['classname'] in cache): return
 
-    if ((ctlr['classname'],) not in cache):
-      if (not any([x['classname'] == ctlr['classname'] for x in buff])):
-        buff.append(ctlr)
-
-    self.commit_ctlr_feed()
-
-  def commit_ctlrs(self, force_commit = 0):
-    buff = self._buff_ctlrs
-    cache = self._cache_ctlr_classnames
-
-    if (not self._will_execute(buff, force_commit)):
-      return
+    self.update_ctlr_cache()
+    if (ctlr['classname'] in cache): return
 
     sql = "INSERT IGNORE INTO `ctlrs` (`classname`, `created_on`" \
       ") VALUES (%(classname)s, %(created_on)s)"
-    written = self._execute(sql, buff, force_commit)
 
-    # Update cache
-    cache[:] = list(set(
-      cache +
-      map(lambda x: (x['classname'], ), written)))
+    self.execute(sql, ctlr)
+    cache.add(ctlr['classname'])
+
+  def update_ctlr_cache(self):
+    try: self._cache_ctlr_classnames
+    except AttributeError: self._cache_ctlr_classnames = set()
+
+    sql = 'SELECT `classname` FROM `ctlrs`'
+    self._cache_ctlr_classnames.update([x[0] for x in self.query(sql)])
 
   def save_ctlr_feed(self, pair):
-    buff = self._buff_ctlr_feed
-
-    if (not pair in buff):
-      buff.append(pair)
-
-    self.commit_ctlr_feed()
-
-  def commit_ctlr_feed(self, force_commit = 0):
-    buff = self._buff_ctlr_feed
-
-    if (not self._will_execute(buff, force_commit)):
-      return
-
-    self.commit_feeds(1)
-    self.commit_ctlrs(1)
-
     sql = "INSERT IGNORE INTO `ctlr_feed` (" \
         "`feed_id`, `ctlr_id`" \
       ") VALUES ("\
@@ -325,8 +295,4 @@ class DB:
         "(SELECT `ctlr_id` FROM `ctlrs` WHERE `classname` = %(classname)s)" \
       ")"
 
-    written = self._execute(sql, buff, force_commit)
-
-  def update_ctlr_cache(self):
-    sql = 'SELECT `classname` FROM `ctlrs`'
-    self._cache_ctlr_classnames = self._load_into_list(sql)
+    self.execute(sql, pair)
