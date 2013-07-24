@@ -2,6 +2,7 @@
 
 from xml.dom import minidom
 from ctlr_base import Ctlr_Base
+from urllib import quote, unquote
 
 class Ctlr_Base_RSS_2_0 (Ctlr_Base):
   """
@@ -17,7 +18,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
     "format": "rss_2_0",
     "holder": 'item',
     "extracts": {
-      "title": {"key": "title"},
+      "title": {"key": "title", "callback": unquote},
       "link": {"key": "url"},
       "pubDate": {"key": "pub_date"}
     }
@@ -27,7 +28,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
   # Implementing Abstract Methods
   # ==============================
   def feed(self, pool, db):
-    from lib import say
+    from lib import logger
 
     Ctlr_Base.feed(self, pool, db)
 
@@ -44,7 +45,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
         'classname': str(self.__class__)
       })
 
-      say('Fetching from feed "%s"' % rss['url'], self)
+      logger.info('%s queued', rss['url'], extra={'classname': self.__class__})
 
       pool.put(rss['url'], self.dispatch_rss_2_0, category = self._parser['format'])
 
@@ -58,9 +59,12 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
       "title": '',
       "pub_date": ''
     }"""
-    dom = minidom.parseString(payload['response'])
-
-    import urllib
+    try:
+      dom = minidom.parseString(payload['response'])
+    except:
+      print("\n**\nRSS parse failed. url='%s'" % payload['url'])
+      print(payload['response'])
+      return
 
     for entry in dom.getElementsByTagName(self._parser['holder']):
       meta = {"feed_url": payload['url']}
@@ -68,7 +72,11 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
         txt = self.getTextByTagName(entry, tag)
         if (txt):
           key = self._parser['extracts'][tag]["key"]
-          meta[key] = txt
+
+          if 'callback' in self._parser['extracts'][tag]:
+            meta[key] = self._parser['extracts'][tag]['callback'](txt)
+          else:
+            meta[key] = txt
 
       url = meta['url'].encode('utf-8')
       del (meta['url'])
@@ -76,9 +84,9 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
       # 檢查 url 是否轉碼妥善 (urlencode)
       if (any(map(lambda(x): x > 127, [ord(x) for x in url]))):
         if (url.startswith('http://') or url.startswith('https://')):
-          url = url[:7] + urllib.quote(url[7:])
+          url = url[:7] + quote(url[7:])
         else:
-          url = urllib.quote(url)
+          url = quote(url)
 
       pool.put(url, self.dispatch_response, category="response", meta = meta)
 

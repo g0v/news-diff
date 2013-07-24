@@ -1,4 +1,5 @@
 # -*- encoding: utf-8 -*-
+#
 from .. import Ctlr_Base_RSS_2_0
 from lxml.html import fromstring
 
@@ -13,21 +14,10 @@ class Ctlr(Ctlr_Base_RSS_2_0):
     {"title": "最新焦點", "url": "http://rss.chinatimes.com/rss/focusing-u.rss"},
 
     {"title": "重點要聞", "url": "http://www.chinatimes.com/realtimenews-focus.rss"},
-    {"title": "社會萬象", "url": "http://www.chinatimes.com/realtimenews-society.rss"},
-    {"title": "運動競技", "url": "http://www.chinatimes.com/realtimenews-sport.rss"},
-    {"title": "生活健康", "url": "http://www.chinatimes.com/realtimenews-life.rss"},
-    {"title": "民生消費", "url": "http://www.chinatimes.com/realtimenews-consumer.rss"},
     {"title": "地方掃描", "url": "http://www.chinatimes.com/realtimenews-local.rss"},
+
     {"title": "政治綜合", "url": "http://www.chinatimes.com/realtimenews-politic.rss"},
     {"title": "國際情報", "url": "http://www.chinatimes.com/realtimenews-international.rss"},
-    {"title": "財經產業", "url": "http://www.chinatimes.com/realtimenews-finance.rss"},
-    {"title": "股市金融", "url": "http://www.chinatimes.com/realtimenews-stock.rss"},
-
-    {"title": "焦點要聞", "url": "http://www.chinatimes.com/chinatimes-focus.rss"},
-    {"title": "社會新聞", "url": "http://www.chinatimes.com/chinatimes-society.rss"},
-    {"title": "地方新聞", "url": "http://www.chinatimes.com/chinatimes-local.rss"},
-    {"title": "財經焦點", "url": "http://www.chinatimes.com/chinatimes-finance.rss"},
-    {"title": "運動天地", "url": "http://www.chinatimes.com/chinatimes-sport.rss"},
   ]
 
   def parse_response(self, payload):

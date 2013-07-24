@@ -25,11 +25,9 @@ class Ctlr(Ctlr_Base_RSS_2_0):
 
     # {"title": "要聞", "url": "http://www.appledaily.com.tw/rss/create/kind/sec/type/11"},
     # {"title": "頭條", "url": "http://www.appledaily.com.tw/rss/create/kind/sec/type/1077"},
-
   ]
 
   def parse_response(self, payload):
-    return False
     content = payload['html'].cssselect(".abdominis .articulum")
 
     if content is None or len(content) == 0: return None

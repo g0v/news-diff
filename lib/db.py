@@ -64,8 +64,7 @@ class DB_Base:
         cursor.executemany(sql, data)
     except Exception as e:
       try :cursor._last_executed
-      except AttributeError:
-        raise e
+      except AttributeError: raise e
 
       print('query error: ')
       print(cursor._last_executed)
@@ -313,15 +312,16 @@ class DB(DB_Meta):
   def save_response(self, payload):
     from json import dumps
     from datetime import datetime
-    from . import Ctlr_Base
+    from . import md5
 
     # deep copy so that we don't mess up the original payload
     _payload = deepcopy(payload)
     _payload["meta"] = dumps(payload['meta'])
+    _payload["response_md5"] = md5(_payload['response'])
 
     sql = "INSERT IGNORE INTO `responses` " + \
-      "(`feed_id`, `url`, `body`, `meta`) VALUES(" + \
+      "(`feed_id`, `url`, `body`, `body_hash`, `meta`) VALUES(" + \
         "(SELECT `feed_id` FROM `feeds` WHERE `url` = %(feed_url)s), " + \
-        "%(url)s, %(response)s, %(meta)s" + \
+        "%(url)s, %(response)s, UNHEX(%(response_md5)s), %(meta)s" + \
         ")"
     self.execute(sql, _payload)

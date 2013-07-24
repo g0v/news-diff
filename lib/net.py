@@ -1,3 +1,5 @@
+# -*- encoding: utf-8 -*-
+#
 portal_ptrn_list = {
   'feedsportal': "\.feedsportal\.com",
 }
@@ -18,38 +20,52 @@ def get_portal(url):
 
   return False
 
-def fix_portal_url(portal, url):
+def break_portal(portal, payload, uo):
   try:
     if 'feedsportal' == portal:
-      return _fix_portal_url_feedsportal(url)
+      return _break_portal_feedsportal(payload, uo)
   except Exception:
-    print('*** Fix Portal Failed (%s, %s) ***' % (portal, url))
+    import traceback
+    print('\n***\nBreak Portal Failed (%s, %s) ***' % (portal, payload['url']))
+    traceback.print_exc()
 
-  raise "can't fix"
-
-def _fix_portal_url_feedsportal(url):
+def _break_portal_feedsportal(payload, uo):
   from lxml.html import fromstring
-  html = fromstring(urllib.urlopen(url).read())
-  return html.cssselect('a')[0].attrib['href']
+
+  html = fromstring(uo.read())
+  payload['url_read'] = html.cssselect('a')[0].attrib['href']
+  payload['response'] = urllib.urlopen(payload['url_read'])
 
 def fetch(payload):
+  import re
   from . import DB
+  from lxml.html import fromstring
   db = DB()
-
-  # feed portal services like feedsportal.com
-  portal = get_portal(payload['url'])
-  if portal:
-    payload['url'] = fix_portal_url(portal, payload['url'])
 
   try:
     uo = urllib.urlopen(payload['url'])
-    response = uo.read()
-    payload['url_read'] = uo.url
-  except Exception as e:
-    response = 'error ' + unicode(e)
-    payload['category'] = 'error'
 
-  payload['response'] = response
+    portal = get_portal(uo.url)
+    if portal:
+      break_portal(portal, payload, uo)
+    else:
+      payload['response'] = uo.read()
+      payload['url_read'] = uo.url
+
+    # encoding other than utf-8
+    try:
+      html = fromstring(payload['response'])
+      tags = html.cssselect('meta[http-equiv=Content-Type]')
+      if (len(tags) > 0 and re.search('charset\s*=\s*big5', tags[0].attrib['content'], re.I)):
+        # 後續分析不依靠 meta tag，因此直接轉為 unicode
+        payload['response'] = unicode(payload['response'], 'big5')
+    except:
+      # not html, do nothing
+      pass
+
+  except Exception as e:
+    payload['response'] = 'error ' + unicode(e)
+    payload['category'] = 'error'
 
   db.save_fetch(payload['url'], payload['response'], payload['category'])
   del payload['category'] # consumed here

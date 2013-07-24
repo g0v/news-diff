@@ -80,10 +80,11 @@ class Worker(Thread):
   針對 pool 中項目依次抓取並調用 callback；
   並傳入 payload, pool, db 三個參數"""
   def __init__(self, pool):
-    from . import DB, say
+    from . import DB, logger
     Thread.__init__(self)
 
-    say('initiated', self)
+    logger.info('initiated', extra={'classname': self.__class__})
+
     self.pool = pool
     self.db = DB()
 
@@ -102,7 +103,7 @@ class Worker(Thread):
         payload['cb'](payload, db = self.db, pool = self.pool)
       except:
         import traceback
-        print("\n=== Parse Error ===")
+        print("\n***\nParse Error")
         traceback.print_exc()
       finally:
         self.pool.task_done()
