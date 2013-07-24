@@ -3,9 +3,9 @@
 -- http://www.phpmyadmin.net
 --
 -- 主機: localhost
--- 產生日期: 2013 年 07 月 19 日 09:20
--- 伺服器版本: 5.5.31-30.3-log
--- PHP 版本: 5.4.15-1ubuntu3
+-- 產生日期: 2013 年 07 月 24 日 18:55
+-- 伺服器版本: 5.6.12-rc60.4
+-- PHP 版本: 5.4.9-4ubuntu2.2
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
@@ -17,10 +17,10 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8 */;
 
 --
--- 資料庫: `news`
+-- 資料庫: `news_develop`
 --
-CREATE DATABASE IF NOT EXISTS `news` DEFAULT CHARACTER SET utf8 COLLATE utf8_bin;
-USE `news`;
+CREATE DATABASE IF NOT EXISTS `news_develop` DEFAULT CHARACTER SET utf8 COLLATE utf8_bin;
+USE `news_develop`;
 
 -- --------------------------------------------------------
 
@@ -29,31 +29,30 @@ USE `news`;
 --
 
 CREATE TABLE IF NOT EXISTS `articles` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `title` varchar(512) COLLATE utf8_bin NOT NULL,
   `pub_ts` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   `created_on` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   `last_seen_on` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `feed_id` mediumint(8) unsigned DEFAULT NULL,
+  `feed_id` mediumint(8) unsigned NOT NULL,
   `ctlr_id` mediumint(8) unsigned NOT NULL,
-  `url` varchar(256) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  `title` varchar(512) COLLATE utf8_bin NOT NULL,
-  `meta` longtext COLLATE utf8_bin NOT NULL,
+  `url_hash` binary(16) NOT NULL COMMENT '原始狀態 url',
+  `url_read_hash` binary(16) NOT NULL COMMENT '若被轉址，記錄最終之 url',
+  `url_canonical_hash` binary(16) NOT NULL COMMENT '若回應中包含該 meta 則留存',
+  `meta_hash` binary(16) NOT NULL,
   `html_hash` binary(16) NOT NULL,
   `text_hash` binary(16) NOT NULL,
-  PRIMARY KEY (`url`,`text_hash`,`created_on`),
-  UNIQUE KEY `text_hash` (`text_hash`,`url`),
-  KEY `html_hash` (`html_hash`),
-  KEY `feed_id` (`feed_id`),
-  KEY `ctlr_id` (`ctlr_id`),
-  KEY `created_on` (`created_on`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `url_canonical_hash_2` (`url_canonical_hash`,`text_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
 
 --
--- 表的結構 `article_htmls`
+-- 表的結構 `article__htmls`
 --
 
-CREATE TABLE IF NOT EXISTS `article_htmls` (
+CREATE TABLE IF NOT EXISTS `article__htmls` (
   `hash` binary(16) NOT NULL,
   `body` mediumtext COLLATE utf8_bin NOT NULL,
   PRIMARY KEY (`hash`)
@@ -62,12 +61,36 @@ CREATE TABLE IF NOT EXISTS `article_htmls` (
 -- --------------------------------------------------------
 
 --
--- 表的結構 `article_texts`
+-- 表的結構 `article__meta`
 --
 
-CREATE TABLE IF NOT EXISTS `article_texts` (
+CREATE TABLE IF NOT EXISTS `article__meta` (
+  `hash` binary(16) NOT NULL,
+  `body` text COLLATE utf8_bin NOT NULL,
+  PRIMARY KEY (`hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+
+-- --------------------------------------------------------
+
+--
+-- 表的結構 `article__texts`
+--
+
+CREATE TABLE IF NOT EXISTS `article__texts` (
   `hash` binary(16) NOT NULL,
   `body` mediumtext COLLATE utf8_bin NOT NULL,
+  PRIMARY KEY (`hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+
+-- --------------------------------------------------------
+
+--
+-- 表的結構 `article__urls`
+--
+
+CREATE TABLE IF NOT EXISTS `article__urls` (
+  `hash` binary(16) NOT NULL,
+  `body` varchar(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   PRIMARY KEY (`hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
@@ -155,10 +178,9 @@ CREATE TABLE IF NOT EXISTS `responses` (
   `feed_id` mediumint(8) unsigned DEFAULT NULL,
   `url` varchar(256) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `body` mediumtext COLLATE utf8_bin NOT NULL,
-  `body_md5` binary(16) NOT NULL,
+  `body_hash` binary(16) NOT NULL,
   `meta` text COLLATE utf8_bin NOT NULL,
-  UNIQUE KEY `body_md5` (`body_md5`,`url`),
-  KEY `ctlr_id` (`feed_id`)
+  UNIQUE KEY `url` (`url`,`body_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin COMMENT='抓取到的文章原文；若內容變動則寫入新列，否則僅修改原列之值';
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

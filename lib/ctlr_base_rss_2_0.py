@@ -59,12 +59,16 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
       "title": '',
       "pub_date": ''
     }"""
+    from . import logger
+
     try:
       dom = minidom.parseString(payload['response'])
     except:
-      print("\n**\nRSS parse failed. url='%s'" % payload['url'])
-      print(payload['response'])
+      logger.error('failed parsing %s', payload['url'], extra={'classname': self.__class__})
       return
+
+    proc_list = []
+    urls = []
 
     for entry in dom.getElementsByTagName(self._parser['holder']):
       meta = {"feed_url": payload['url']}
@@ -87,8 +91,16 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
           url = url[:7] + quote(url[7:])
         else:
           url = quote(url)
+      proc_list.append({'url': url, 'meta': meta})
+      urls.append(url)
 
-      pool.put(url, self.dispatch_response, category="response", meta = meta)
+    urls = db.get_fresh_urls(urls)
+
+    for proc in proc_list:
+      if (proc['url'] in urls):
+        pool.put(proc['url'], self.dispatch_response, category="response", meta = proc['meta'])
+      else:
+        logger.info('%s found and skipped', proc['url'], extra={'classname': self.__class__})
 
   # ==============================
   # minidom

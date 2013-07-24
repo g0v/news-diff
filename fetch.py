@@ -7,8 +7,8 @@
 # CTLR-based Fetches
 ctlr_list = [
   'appledaily',
-  #'chinatimes',
-  #'libertytimes',
+  'chinatimes',
+  'libertytimes',
 ]
 
 from lib import proc, conf, Queue, DB

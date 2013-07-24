@@ -22,7 +22,7 @@ from proc import Queue
 _format = '%(classname)-35s %(levelname)s %(message)s'
 logging.basicConfig(format=_format)
 logger = logging.getLogger('news-diff')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 # Util
 def md5(unicode_str):

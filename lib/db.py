@@ -185,15 +185,12 @@ class DB_Meta(DB_Base):
 
     self.execute(sql, pair)
 
-class DB(DB_Meta):
+class DB_Data(DB_Meta):
   """管理下列目標資料 ：
    - fetch
    - response
    - article
   """
-
-  def __init__(self, server = 'default'):
-    DB_Meta.__init__(self, server)
 
   #
   # Fetch
@@ -212,23 +209,6 @@ class DB(DB_Meta):
   # article
   #
 
-  def list_revisits(self):
-    """輸出需要 revisit 的新聞列表, 包含 meta 欄位
-
-    @see: Ctlr_Base.do_revisit()"""
-    from . import conf, Ctlr_Base
-
-    sql = "SELECT " \
-      "`a`.`created_on`, `a`.`last_seen_on`, `a`.`pub_ts`, `f`.`url`, `a`.`url`, `a`.`title`, `a`.`meta`, ( "\
-      "  SELECT `c`.`classname` FROM `ctlrs` c NATURAL JOIN `ctlr_feed` `cf` " \
-      "  WHERE `cf`.`feed_id` = `a`.`feed_id` ORDER BY `c`.`created_on` DESC LIMIT 1 " \
-      ") `classname` " \
-      "FROM `articles` a LEFT JOIN `feeds` f on f.`feed_id` = a.`feed_id` " \
-      'WHERE `created_on` > CURRENT_TIMESTAMP - INTERVAL %d MINUTE' % \
-      Ctlr_Base.revisit_max_min()
-
-    return [x for x in self._load_into_list(sql) \
-      if Ctlr_Base.need_revisit(x[0], x[1])]
 
   #
   # Hashtbl
@@ -325,3 +305,43 @@ class DB(DB_Meta):
         "%(url)s, %(response)s, UNHEX(%(response_md5)s), %(meta)s" + \
         ")"
     self.execute(sql, _payload)
+
+class DB(DB_Data):
+  """提供各類列表功能"""
+
+  def list_revisits(self):
+    """輸出需要 revisit 的新聞列表, 包含 meta 欄位
+
+    @see: Ctlr_Base.do_revisit()"""
+    from . import conf, Ctlr_Base
+
+    sql = "SELECT " \
+      "`a`.`created_on`, `a`.`last_seen_on`, `a`.`pub_ts`, `f`.`url`, `a`.`url`, `a`.`title`, `a`.`meta`, ( "\
+      "  SELECT `c`.`classname` FROM `ctlrs` c NATURAL JOIN `ctlr_feed` `cf` " \
+      "  WHERE `cf`.`feed_id` = `a`.`feed_id` ORDER BY `c`.`created_on` DESC LIMIT 1 " \
+      ") `classname` " \
+      "FROM `articles` a LEFT JOIN `feeds` f on f.`feed_id` = a.`feed_id` " \
+      'WHERE `created_on` > CURRENT_TIMESTAMP - INTERVAL %d MINUTE' % \
+      Ctlr_Base.revisit_max_min()
+
+    return [x for x in self._load_into_list(sql) \
+      if Ctlr_Base.need_revisit(x[0], x[1])]
+
+  def get_fresh_urls(self, urls):
+    """篩選出 urls 中未曾成功抓取過者並回傳"""
+
+    from . import md5
+    from net import normalize_url
+
+    url_md5 = [{'url': x, 'md5': md5(normalize_url(x))} for x in urls]
+    hashes = "(" + (",".join(["UNHEX('%s')" % x['md5'] for x in url_md5 ])) + ")"
+    sql = "SELECT HEX(`hash`) FROM `article__urls` WHERE `hash` IN %s" % hashes
+
+    ret = set(self.query(sql))
+
+    output = []
+    for x in url_md5:
+      if not (x['md5'].upper(),) in ret:
+        output.append(x['url'])
+
+    return output
