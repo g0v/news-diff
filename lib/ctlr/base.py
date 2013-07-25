@@ -9,40 +9,17 @@ class Ctlr_Base:
 
 
   # ==============================
-  # Configs for Base Ctlrs
+  # Override These
   # ==============================
 
-  # Controller definition
-
-  _my_feeds = [
-    #{"title": "要聞", "url": "http://www.appledaily.com.tw/rss/create/kind/sec/type/11"},
-  ]
-
-  # ==============================
-  # Methods to be Overrided
-  # ==============================
-
-  def feed(self, pool, dbi):
-    """在子類別中擴充並呼叫此函式, 並排程 pool """
-
-    from datetime import datetime
-    from lib import db
-
-    ctlr_sig = {"classname": unicode(self.__class__)}
-    if self._created_on:
-      ctlr_sig['created_on'] = lib.util.to_date(self._created_on)
-    else:
-      ctlr_sig['created_on'] = datetime.utcnow()
-
-    db.save_host(self.get_host(), dbi = dbi)
-    db.save_ctlr(ctlr_sig, dbi = dbi)
-
-  # ==============================
-  # Ctlr Configs & Overrides
-  # ==============================
 
   # Ctlr 生效時間
   _created_on = None
+
+  # Ctlr 抓取目標
+  _my_feeds = [
+    #{"title": "要聞", "url": "http://www.appledaily.com.tw/rss/create/kind/sec/type/11"},
+  ]
 
   def parse_response(self, payload, pool, dbi):
     """解析 fetcher 抓回之 response
@@ -58,6 +35,25 @@ class Ctlr_Base:
     由 dispatch_response 儲存資料
     """
     pass
+
+  # ==============================
+  # Methods to be Overrided
+  # ==============================
+
+  def feed(self, pool, dbi):
+    """在子類別中擴充並呼叫此函式, 並排程 pool """
+
+    from datetime import datetime
+    from lib import db, util
+
+    ctlr_sig = {"classname": unicode(self.__class__)}
+    if self._created_on:
+      ctlr_sig['created_on'] = util.dt.to_date(self._created_on)
+    else:
+      ctlr_sig['created_on'] = datetime.utcnow()
+
+    db.save_host(self.get_host(), dbi = dbi)
+    db.save_ctlr(ctlr_sig, dbi = dbi)
 
   # ==============================
   # Procedural
@@ -136,7 +132,7 @@ class Ctlr_Base:
     self.css_sel_drop_tree(article['content'], ['script'])
 
     #prettify html with BeautifulSoup
-    article['content'] = BeautifulSoup(tostring(article['content'])).body.next
+    article['content'] = BeautifulSoup(tostring(article['content'], encoding=unicode)).body.next
 
     article['text'] = pack_string(article['content'].text)
     article['html'] = pack_string(unicode(article['content']))

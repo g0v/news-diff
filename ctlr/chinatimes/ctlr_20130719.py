@@ -5,6 +5,7 @@ from lib import Ctlr_Base_RSS_2_0
 class Ctlr(Ctlr_Base_RSS_2_0):
   """中間大圖樣版，上方有字型調整按鈕，url 無 .html"""
 
+  _created_on = '2013-07-25T16:33:26'
   _my_feeds = [
     {"title": "最新焦點", "url": "http://rss.chinatimes.com/rss/focusing-u.rss"},
   ]
@@ -27,6 +28,7 @@ class Ctlr(Ctlr_Base_RSS_2_0):
 class Ctlr2(Ctlr_Base_RSS_2_0):
   """多文字樣版，url 以 .html 結尾"""
 
+  _created_on = '2013-07-25T16:33:26'
   _my_feeds = [
     {"title": "焦點", "url": "http://rss.chinatimes.com/rss/focus-u.rss"},
     {"title": "政治", "url": "http://rss.chinatimes.com/rss/Politic-u.rss"},

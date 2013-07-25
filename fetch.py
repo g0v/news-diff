@@ -5,7 +5,11 @@
 ctlr_list = [
   'appledaily',
   'chinatimes',
+  'coolloud',
+  'e_info_org_tw',
   'libertytimes',
+  'newtalk',
+  'udn',
 ]
 
 from threading import Condition
