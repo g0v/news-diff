@@ -6,13 +6,13 @@
 # Revisit
 # ==============================
 # Revisits
-def feed_revisit(pool, db = None):
+def feed_revisit(pool, dbi = None):
   from lib import DB
 
-  if db is None: _db = DB()
-  else: _db = db
+  if dbi is None: _dbi = DB()
+  else: _dbi = dbi
 
-  if db is None: _db.disconnect()
+  if dbi is None: _dbi.disconnect()
 
 
 def revisit_tbl():

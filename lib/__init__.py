@@ -3,27 +3,19 @@
 #
 
 # Config
-import json
-import threading
-import logging
-from os.path import dirname, join
+from conf import conf
 
-_filenames = ['db', 'config']
-conf = {}
+# Logging
+from logger import logger
 
-for _filename in _filenames:
-  with open(join(dirname(dirname(__file__)), 'conf', _filename + '.json'), 'r') as fp:
-    conf[_filename] = json.load(fp)
-
-# Aliases
-from db import DB
+# 以此 (lib.Ctlr_*) 為基準，避免物件變動後失去繼承鍊
 from ctlr import *
-from util import Queue, Worker, fetch
 
+# 引入其公開功能
 import proc
+import db
+import util
 
-# logging
-_format = '%(classname)-35s %(levelname)s %(message)s'
-logging.basicConfig(format=_format)
-logger = logging.getLogger('news-diff')
-logger.setLevel(logging.WARNING)
+# Shortcuts
+from util.parallel import Queue, Worker
+from db import DB

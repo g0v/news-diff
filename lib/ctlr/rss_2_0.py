@@ -27,10 +27,10 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
   # ==============================
   # Implementing Abstract Methods
   # ==============================
-  def feed(self, pool, db):
-    from lib import logger
+  def feed(self, pool, dbi):
+    from lib import db, logger
 
-    Ctlr_Base.feed(self, pool, db)
+    Ctlr_Base.feed(self, pool, dbi)
 
     for rss in self._my_feeds:
       if ('title' not in rss):
@@ -39,11 +39,11 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
       if ('host_url' not in rss):
         rss['host_url'] = self.get_host()['url']
 
-      db.save_feed(rss)
+      db.save_feed(rss, dbi = dbi)
       db.save_ctlr_feed({
         'url': rss['url'],
         'classname': str(self.__class__)
-      })
+      }, dbi = dbi)
 
       logger.info('%s queued', rss['url'], extra={'classname': self.__class__})
 
@@ -53,7 +53,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
   #
   # ==============================
 
-  def dispatch_rss_2_0(self, payload, pool, db):
+  def dispatch_rss_2_0(self, payload, pool, dbi):
     """解析 XML 格式的 RSS feed, 打包 meta 轉送給 fetcher 之格式為 {
       "feed_url": '',
       "title": '',
@@ -64,7 +64,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
     """
     from xml.dom import minidom
 
-    from lib import logger
+    from lib import logger, db
 
     try:
       dom = minidom.parseString(payload['response'])

@@ -81,7 +81,7 @@ class Worker(Thread):
     logger.info('initiated', extra={'classname': self.__class__})
 
     self.pool = pool
-    self.db = DB()
+    self.dbi = DB()
 
   def run(self):
     import traceback
@@ -96,7 +96,7 @@ class Worker(Thread):
       except Empty: break
 
       try:
-        payload = fetch(payload, db = self.db)
+        payload = fetch(payload, dbi = self.dbi)
       except:
         print("\n***\nUnhandled Fetch Error")
         traceback.print_exc()
@@ -105,7 +105,7 @@ class Worker(Thread):
         continue
 
       try:
-        payload['cb'](payload, db = self.db, pool = self.pool)
+        payload['cb'](payload, dbi = self.dbi, pool = self.pool)
       except:
         print("\n***\nUnhandled Parse Error")
         traceback.print_exc()

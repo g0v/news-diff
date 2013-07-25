@@ -2,13 +2,13 @@
 #
 #
 
-def feed_catchup(pool, db = None):
+def feed_catchup(pool, dbi = None):
   from lib import DB
 
-  if db is None: _db = DB()
-  else: _db = db
+  if dbi is None: _dbi = DB()
+  else: _dbi = dbi
 
-  if db is None: _db.disconnect()
+  if dbi is None: _dbi.disconnect()
 
 def dispatch_catchup(self, payload):
   """處理 responses 中解析失敗的資料"""

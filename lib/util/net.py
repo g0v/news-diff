@@ -37,18 +37,18 @@ def _break_portal_feedsportal(payload, uo):
     payload['url_read'] = uo.url
     payload['response'] = text
 
-def fetch(payload, db = None):
+def fetch(payload, dbi = None):
   """抓取 payload['url'] 的檔案
   並將最終讀取到的 url 寫入 payload['url_read'], response 寫入 payload['response']
   """
   import re
   from lxml.html import fromstring
 
-  from lib import DB
-  from lib.util import to_unicode
+  from lib import db, DB
+  from lib.util.text import to_unicode
 
-  if db is None: _db = DB()
-  else: _db = db
+  if dbi is None: _dbi = DB()
+  else: _dbi = dbi
 
   try:
     uo = urllib.urlopen(payload['url'])
@@ -67,9 +67,14 @@ def fetch(payload, db = None):
   if 'url_read' not in payload:
     payload['url_read'] = payload['url']
 
-  _db.save_fetch(payload['url'], to_unicode(payload['response']), payload['category'])
+  db.save_fetch(payload['url'], to_unicode(payload['response']), payload['category'], dbi = _dbi)
   del payload['category'] # consumed here
 
-  if db is None: _db.disconnect()
+  if dbi is None: _dbi.disconnect()
 
   return payload
+
+def normalize_url(url):
+  import re
+  url = url.rstrip('/')
+  return re.sub('^https?://', '', url)

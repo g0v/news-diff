@@ -22,19 +22,20 @@ class Ctlr_Base:
   # Methods to be Overrided
   # ==============================
 
-  def feed(self, pool, db):
+  def feed(self, pool, dbi):
     """在子類別中擴充並呼叫此函式, 並排程 pool """
 
     from datetime import datetime
+    from lib import db
 
     ctlr_sig = {"classname": unicode(self.__class__)}
     if self._created_on:
-      ctlr_sig['created_on'] = self.to_date(self._created_on)
+      ctlr_sig['created_on'] = lib.util.to_date(self._created_on)
     else:
       ctlr_sig['created_on'] = datetime.utcnow()
 
-    db.save_host(self.get_host())
-    db.save_ctlr(ctlr_sig)
+    db.save_host(self.get_host(), dbi = dbi)
+    db.save_ctlr(ctlr_sig, dbi = dbi)
 
   # ==============================
   # Ctlr Configs & Overrides
@@ -43,7 +44,7 @@ class Ctlr_Base:
   # Ctlr 生效時間
   _created_on = None
 
-  def parse_response(self, payload, pool, db):
+  def parse_response(self, payload, pool, dbi):
     """解析 fetcher 抓回之 response
 
     payload 之輸入為：{
@@ -62,7 +63,7 @@ class Ctlr_Base:
   # Procedural
   # ==============================
 
-  def dispatch_response(self, payload, pool, db):
+  def dispatch_response(self, payload, pool, dbi):
     """
     處理 fetcher 傳回之資料，調用 parse_response 解析其內容並儲存。
 
@@ -80,9 +81,10 @@ class Ctlr_Base:
     @endpoint
     """
     import lxml.html
-    from lib import logger
+    from lib import logger, util, db
+    from lib.util.dt import to_timestamp
 
-    try: payload['pub_ts'] = Ctlr_Base.to_timestamp(payload['meta']['pub_date'])
+    try: payload['pub_ts'] = to_timestamp(payload['meta']['pub_date'])
     except KeyError: pass
 
     # dom tree 前處理
@@ -115,10 +117,10 @@ class Ctlr_Base:
     if article:
       # parsed successfully
       self._decorate_article(article)
-      db.save_article(article)
+      db.save_article(article, dbi = dbi)
       pool.log_stats('done_article')
     else:
-      db.save_response(payload)
+      db.save_response(payload, dbi = dbi)
       pool.log_stats('error_parse')
 
   def _decorate_article(self, article):
@@ -127,7 +129,8 @@ class Ctlr_Base:
     # html post-process
     from lxml.html import tostring, fromstring
     from bs4 import BeautifulSoup
-    from lib.util import normalize_url
+    from lib.util.net import normalize_url
+    from lib.util.text import pack_string
 
     #remove unwanted tags
     self.css_sel_drop_tree(article['content'], ['script'])
@@ -135,8 +138,8 @@ class Ctlr_Base:
     #prettify html with BeautifulSoup
     article['content'] = BeautifulSoup(tostring(article['content'])).body.next
 
-    article['text'] = self.pack_string(article['content'].text)
-    article['html'] = self.pack_string(unicode(article['content']))
+    article['text'] = pack_string(article['content'].text)
+    article['html'] = pack_string(unicode(article['content']))
     article["ctlr_classname"] = str(self.__class__)
 
     article['url'] = normalize_url(article['url'])
@@ -172,42 +175,6 @@ class Ctlr_Base:
       payload[key] = payload['meta'][key]
       del payload['meta'][key]
     except KeyError: pass
-
-  @staticmethod
-  def to_date(value):
-    """將 value 轉換為 datetime object, 包含時差資訊"""
-    from dateutil import parser
-    from datetime import datetime
-
-    mytype = type(value)
-
-    if mytype is int or mytype is float:
-      # interpret as timestamp, utc
-      return datetime(value)
-
-    if mytype is datetime:
-      return value
-
-    dt = parser.parse(value)
-    return dt
-
-  @staticmethod
-  def to_timestamp(value):
-    mytype = type(value)
-    if mytype is int or mytype is float:
-      return value
-
-    import time
-    return time.mktime(Ctlr_Base.to_date(value).utctimetuple())
-
-  @staticmethod
-  def pack_string(input):
-    """去除字串中對人閱讀無用的字符"""
-    import re
-    output = re.sub('\r', '\n', input)
-    output = re.sub('\n+', '\n', output)
-    output = re.sub('\s+', ' ', output)
-    return output.strip()
 
   # ==============================
   #

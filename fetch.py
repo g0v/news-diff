@@ -9,19 +9,19 @@ ctlr_list = [
 ]
 
 from threading import Condition
-from lib import proc, conf, Queue, Worker, DB
+import lib
 
-jobs = Queue()
-db = DB()
+jobs = lib.Queue()
+db = lib.DB()
 
-proc.feed_fetch(jobs, ctlr_list, db)
-proc.feed_revisit(jobs, db)
+lib.proc.feed_fetch(jobs, ctlr_list, db)
+lib.proc.feed_revisit(jobs, db)
 
 db.disconnect()
 
 # initiate worker threads
-for i in xrange(conf['config']['threads']):
-  Worker(jobs).start()
+for i in xrange(lib.conf['config']['threads']):
+  lib.Worker(jobs).start()
 
 if (jobs.unfinished_tasks > 0):
   jobs.join()
