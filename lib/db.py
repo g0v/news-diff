@@ -9,8 +9,6 @@
 fetch_categories_ignored = ['response', 'revisit', 'rss_2_0']
 # fetch_categories_ignored = []
 
-from copy import deepcopy
-
 class DB_Base:
   """提供資料庫底層操作功能"""
 
@@ -243,6 +241,7 @@ class DB_Data(DB_Meta):
     """更新新聞內容"""
     from json import dumps
     from datetime import datetime
+    from copy import deepcopy
 
     from lib.util import md5
 
@@ -297,6 +296,7 @@ class DB_Data(DB_Meta):
   def save_response(self, payload):
     from json import dumps
     from datetime import datetime
+    from copy import deepcopy
 
     from lib.util import md5
 

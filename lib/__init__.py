@@ -16,7 +16,7 @@ from net import fetch
 from db import DB
 from ctlr_base import Ctlr_Base
 from ctlr_base_rss_2_0 import Ctlr_Base_RSS_2_0
-from proc import Queue
+from parallel import Queue, Worker
 
 import util
 

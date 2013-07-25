@@ -1,10 +1,11 @@
 # -*- encoding: utf-8 -*-
 #
+
+import urllib
+
 portal_ptrn_list = {
   'feedsportal': "\.feedsportal\.com",
 }
-
-import urllib
 
 def get_portal(url):
   import re
@@ -69,6 +70,6 @@ def fetch(payload, db = None):
   _db.save_fetch(payload['url'], to_unicode(payload['response']), payload['category'])
   del payload['category'] # consumed here
 
-  db.disconnect()
+  if db is None: _db.disconnect()
 
   return payload

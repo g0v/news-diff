@@ -1,11 +1,10 @@
+# -*- encoding: utf-8 -*-
+#
+#
 
-  def dispatch_catchup(self, payload):
-    """處理 responses 中解析失敗的資料"""
-    raise Exception('Not Implemented, yet')
-
-  # ==============================
-  # Revisit
-  # ==============================
+# ==============================
+# Revisit
+# ==============================
 
   @staticmethod
   def revisit_tbl():
@@ -72,11 +71,3 @@
       f.queue(x[4], ctlr.dispatch_response, category="revisit", meta = meta)
 
     f.start()
-
-  @staticmethod
-  def do_fetch(ctlr_list):
-    for pkg in ctlr_list:
-      module = importlib.import_module('lib.%s' % pkg)
-
-      for ctlr in module.Ctlrs:
-        ctlr().run()

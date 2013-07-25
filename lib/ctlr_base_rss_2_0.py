@@ -1,6 +1,5 @@
 # -*- encoding: utf-8 -*-
 
-from xml.dom import minidom
 from ctlr_base import Ctlr_Base
 from urllib import quote, unquote
 
@@ -58,13 +57,19 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
       "feed_url": '',
       "title": '',
       "pub_date": ''
-    }"""
-    from . import logger
+    }
+
+    @endpoint
+    """
+    from xml.dom import minidom
+
+    from lib import logger
 
     try:
       dom = minidom.parseString(payload['response'])
     except:
       logger.error('failed parsing %s', payload['url'], extra={'classname': self.__class__})
+      pool.log_stats('error_parse')
       return
 
     proc_list = []
@@ -102,6 +107,8 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
       else:
         pool.log_stats('skipped')
         logger.info('%s found and skipped', proc['url'], extra={'classname': self.__class__})
+
+    pool.log_stats('done_feed')
 
   # ==============================
   # minidom

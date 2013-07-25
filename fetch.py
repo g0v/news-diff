@@ -11,8 +11,8 @@ ctlr_list = [
   'libertytimes',
 ]
 
-from lib import proc, conf, Queue, DB
 from threading import Condition
+from lib import proc, conf, Queue, Worker, DB
 
 jobs = Queue()
 db = DB()
@@ -27,7 +27,7 @@ db.disconnect()
 
 # initiate worker threads
 for i in xrange(conf['config']['threads']):
-  proc.Worker(jobs).start()
+  Worker(jobs).start()
 
 if (jobs.unfinished_tasks > 0):
   jobs.join()

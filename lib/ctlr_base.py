@@ -1,7 +1,5 @@
 # -*- encoding:utf-8 -*-
 
-import importlib
-
 class Ctlr_Base:
   """
   抓取並解析單篇文章的基底類別；
@@ -82,6 +80,7 @@ class Ctlr_Base:
       'html': lxml tree
     }
 
+    @endpoint
     """
     import lxml.html
     from lib import logger
@@ -96,6 +95,7 @@ class Ctlr_Base:
       extra = {'classname': self.__class__}
       logger.warning("HTML parse error, url: %s", payload['url_read'], extra=extra)
       logger.warning("Got: %s", payload['response'], extra=extra)
+      pool.log_stats('error_parse')
       return
 
     # canonical url
@@ -119,8 +119,10 @@ class Ctlr_Base:
       # parsed successfully
       self._decorate_article(article)
       db.save_article(article)
+      pool.log_stats('done_article')
     else:
       db.save_response(payload)
+      pool.log_stats('error_parse')
 
   def _decorate_article(self, article):
     """在 parse_response 後執行，後處理其輸出"""
