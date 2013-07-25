@@ -1,14 +1,9 @@
 # -*- encoding: utf-8 -*-
 #
-from .. import Ctlr_Base_RSS_2_0
-from lxml.html import fromstring
+from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
   """中間大圖樣版，上方有字型調整按鈕，url 無 .html"""
-  _my_host = {
-    "name": "中時電子報",
-    "url": "http://www.chinatimes.com/",
-  }
 
   _my_feeds = [
     {"title": "最新焦點", "url": "http://rss.chinatimes.com/rss/focusing-u.rss"},
@@ -37,10 +32,6 @@ class Ctlr(Ctlr_Base_RSS_2_0):
 
 class Ctlr2(Ctlr_Base_RSS_2_0):
   """多文字樣版，url 以 .html 結尾"""
-  _my_host = {
-    "name": "中時電子報",
-    "url": "http://www.chinatimes.com/",
-  }
 
   _my_feeds = [
     {"title": "焦點", "url": "http://rss.chinatimes.com/rss/focus-u.rss"},

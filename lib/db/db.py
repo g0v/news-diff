@@ -30,7 +30,7 @@ class DB_Base:
     import MySQLdb
 
     if (not (self._conn and self._conn.open)):
-      from . import conf
+      from lib import conf
 
       dbconf = conf['db'][self._server]
 
@@ -319,7 +319,7 @@ class DB(DB_Data):
     """輸出需要 revisit 的新聞列表, 包含 meta 欄位
 
     @see: Ctlr_Base.do_revisit()"""
-    from . import conf, Ctlr_Base
+    from lib import conf, Ctlr_Base
 
     sql = "SELECT " \
       "`a`.`created_on`, `a`.`last_seen_on`, `a`.`pub_ts`, `f`.`url`, `a`.`url`, `a`.`title`, `a`.`meta`, ( "\

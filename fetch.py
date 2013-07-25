@@ -1,9 +1,6 @@
 #!/usr/bin/python
 #-*- encoding:utf-8 -*-
 
-# ==========================
-
-
 # CTLR-based Fetches
 ctlr_list = [
   'appledaily',
@@ -17,10 +14,7 @@ from lib import proc, conf, Queue, Worker, DB
 jobs = Queue()
 db = DB()
 
-# lib.Ctlr_Base.do_fetch(ctlr_list)
 proc.feed_fetch(jobs, ctlr_list, db)
-
-# Revisits
 proc.feed_revisit(jobs, db)
 
 db.disconnect()

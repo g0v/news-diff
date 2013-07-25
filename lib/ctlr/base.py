@@ -1,5 +1,6 @@
 # -*- encoding:utf-8 -*-
-
+#
+#
 class Ctlr_Base:
   """
   抓取並解析單篇文章的基底類別；
@@ -12,21 +13,17 @@ class Ctlr_Base:
   # ==============================
 
   # Controller definition
-  _my_host = {
-    # "name": "蘋果日報",
-    # "url": "http://www.appledaily.com.tw/",
-  }
 
   _my_feeds = [
     #{"title": "要聞", "url": "http://www.appledaily.com.tw/rss/create/kind/sec/type/11"},
   ]
 
   # ==============================
-  # Methods for Override
+  # Methods to be Overrided
   # ==============================
 
   def feed(self, pool, db):
-    """在子類別中擴充此函式, 以將工作排程入 pool 中"""
+    """在子類別中擴充並呼叫此函式, 並排程 pool """
 
     from datetime import datetime
 
@@ -36,7 +33,7 @@ class Ctlr_Base:
     else:
       ctlr_sig['created_on'] = datetime.utcnow()
 
-    db.save_host(self._my_host)
+    db.save_host(self.get_host())
     db.save_ctlr(ctlr_sig)
 
   # ==============================
@@ -156,6 +153,11 @@ class Ctlr_Base:
   # ==============================
   # Utilities
   # ==============================
+  def get_host(self):
+    import importlib
+    module_name = str(self.__class__).rsplit('.', 2)[0]
+    ns = importlib.import_module(module_name)
+    return ns.host
 
   @staticmethod
   def move_into_meta(payload, key):

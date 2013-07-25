@@ -25,3 +25,7 @@ def normalize_url(url):
   import re
   url = url.rstrip('/')
   return re.sub('^https?://', '', url)
+
+# aliases
+from net import fetch
+from parallel import Queue, Worker

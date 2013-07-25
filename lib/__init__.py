@@ -1,3 +1,7 @@
+# -*- encoding:utf-8 -*-
+#
+#
+
 # Config
 import json
 import threading
@@ -12,13 +16,11 @@ for _filename in _filenames:
     conf[_filename] = json.load(fp)
 
 # Aliases
-from net import fetch
 from db import DB
-from ctlr_base import Ctlr_Base
-from ctlr_base_rss_2_0 import Ctlr_Base_RSS_2_0
-from parallel import Queue, Worker
+from ctlr import *
+from util import Queue, Worker, fetch
 
-import util
+import proc
 
 # logging
 _format = '%(classname)-35s %(levelname)s %(message)s'

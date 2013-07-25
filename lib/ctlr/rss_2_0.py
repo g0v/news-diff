@@ -1,7 +1,8 @@
 # -*- encoding: utf-8 -*-
 
-from ctlr_base import Ctlr_Base
 from urllib import quote, unquote
+
+from base import Ctlr_Base
 
 class Ctlr_Base_RSS_2_0 (Ctlr_Base):
   """
@@ -36,7 +37,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
         rss['title'] = None
 
       if ('host_url' not in rss):
-        rss['host_url'] = self._my_host['url']
+        rss['host_url'] = self.get_host()['url']
 
       db.save_feed(rss)
       db.save_ctlr_feed({

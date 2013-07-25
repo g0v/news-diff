@@ -1,13 +1,7 @@
 # -*- encoding: utf-8 -*-
-from .. import Ctlr_Base_RSS_2_0
-from lxml.html import fromstring
+from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
-  _my_host = {
-    "name": "蘋果日報",
-    "url": "http://www.appledaily.com.tw/",
-  }
-
   _my_feeds = [
     {"title": "即時社會", "url": "http://www.appledaily.com.tw/rss/newcreate/kind/rnews/type/102"},
     {"title": "即時生活", "url": "http://www.appledaily.com.tw/rss/create/kind/rnews/type/105"},

@@ -1,11 +1,8 @@
 # -*- encoding: utf-8 -*-
-from .. import Ctlr_Base_RSS_2_0
+#
+from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
-  _my_host = {
-    "name": "自由時報",
-    "url": "http://www.libertytimes.com.tw/",
-  }
 
   _my_feeds = [
     {"title": "焦點新聞", "url": "http://www.libertytimes.com.tw/rss/fo.xml"},

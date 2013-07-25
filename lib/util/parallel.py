@@ -75,7 +75,7 @@ class Worker(Thread):
   @endpoint
   """
   def __init__(self, pool):
-    from . import DB, logger
+    from lib import DB, logger
     Thread.__init__(self)
 
     logger.info('initiated', extra={'classname': self.__class__})
@@ -87,7 +87,7 @@ class Worker(Thread):
     import traceback
     from time import sleep
 
-    from lib import fetch
+    from net import fetch
 
     sleep(1)
 
