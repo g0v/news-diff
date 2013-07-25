@@ -106,7 +106,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
       if (proc['url'] in urls):
         pool.put(proc['url'], self.dispatch_response, category="response", meta = proc['meta'])
       else:
-        pool.log_stats('skipped')
+        pool.log_stats('done_skipped')
         logger.info('%s found and skipped', proc['url'], extra={'classname': self.__class__})
 
     pool.log_stats('done_feed')

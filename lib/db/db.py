@@ -81,7 +81,7 @@ class DB:
     cursor = _dbi.cursor(cursorclass=SSCursor)
 
     try: cursor.execute(sql)
-    except ProgrammingError as e:
+    except Exception as e:
       print(cursor._last_executed)
       raise e
 

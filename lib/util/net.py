@@ -47,12 +47,8 @@ def fetch(payload, dbi = None):
   from lib import db, DB
   from lib.util.text import to_unicode
 
-  if dbi is None: _dbi = DB()
-  else: _dbi = dbi
-
   try:
     uo = urllib.urlopen(payload['url'])
-
     portal = get_portal(uo.url)
     if portal:
       break_portal(portal, payload, uo)
@@ -63,14 +59,20 @@ def fetch(payload, dbi = None):
   except Exception as e:
     payload['response'] = 'error ' + unicode(e)
     payload['category'] = 'error'
+    payload['exception'] = e
+
 
   if 'url_read' not in payload:
     payload['url_read'] = payload['url']
 
-  db.save_fetch(payload['url'], to_unicode(payload['response']), payload['category'], dbi = _dbi)
-  del payload['category'] # consumed here
+  if dbi is None: _dbi = DB()
+  else: _dbi = dbi
 
+  db.save_fetch(payload['url'], to_unicode(payload['response']), payload['category'], dbi = _dbi)
   if dbi is None: _dbi.disconnect()
+
+  if 'error' == payload['category']:
+    raise payload['exception']
 
   return payload
 

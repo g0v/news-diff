@@ -21,15 +21,20 @@ class Queue(_Queue):
 
     self._stats_lock = RLock()
     self._stats = {
+      # 表示其它執行來源，標記為 @startpoint；結果會登記至 done / error
+      'with_revisit': 0, # 透過 revisit 產生的 request
+      'with_catchup': 0, # 透過 catchup 發動的資料流程，不送 request
+      # 表示執行結果，標記為 @endpoint
       'done_feed': 0,
       'done_article': 0,
-      'skipped': 0,
+      'done_skipped': 0,
       'error_fetch': 0,
       'error_parse': 0,
       'error_unhandled': 0,
     }
 
   def get_stats(self):
+    """"""
     from copy import deepcopy
     return deepcopy(self._stats)
 
@@ -53,7 +58,7 @@ class Queue(_Queue):
 
     # check param `url`
     if not self.put_url(url):
-      self.log_stats('skipped')
+      self.log_stats('done_skipped')
       return False
 
     # fill-in other params
@@ -98,9 +103,9 @@ class Worker(Thread):
       try:
         payload = fetch(payload, dbi = self.dbi)
       except:
-        print("\n***\nUnhandled Fetch Error")
+        print("\n***\nFetch Error")
         traceback.print_exc()
-        self.pool.log_stats('error_unhandled')
+        self.pool.log_stats('error_fetch')
         self.pool.task_done()
         continue
 

@@ -7,12 +7,6 @@ class Ctlr(Ctlr_Base_RSS_2_0):
 
   _my_feeds = [
     {"title": "最新焦點", "url": "http://rss.chinatimes.com/rss/focusing-u.rss"},
-
-    {"title": "重點要聞", "url": "http://www.chinatimes.com/realtimenews-focus.rss"},
-    {"title": "地方掃描", "url": "http://www.chinatimes.com/realtimenews-local.rss"},
-
-    {"title": "政治綜合", "url": "http://www.chinatimes.com/realtimenews-politic.rss"},
-    {"title": "國際情報", "url": "http://www.chinatimes.com/realtimenews-international.rss"},
   ]
 
   def parse_response(self, payload):
