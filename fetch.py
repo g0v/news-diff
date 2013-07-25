@@ -31,3 +31,5 @@ for i in xrange(conf['config']['threads']):
 
 if (jobs.unfinished_tasks > 0):
   jobs.join()
+
+print(jobs.get_stats())

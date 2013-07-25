@@ -42,13 +42,37 @@ def feed_catchup(pool, db = None):
 
 
 class Queue(_Queue):
-  """Job Queue, 包裝底層的 fetcher"""
+  """Job Queue, 包裝底層的 fetcher
+
+  stats 來源：
+   - 主循環 (queue -> worker -> fetch and parse)
+   - Ctrl_RSS 快取本次抓過的 url，因此可觸發 skipped
+  """
 
   def __init__(self, maxsize = 0):
     _Queue.__init__(self, maxsize)
 
     self._url_cache_lock = RLock()
     self.url_cache = set()
+
+    self._stats_lock = RLock()
+    self._stats = {
+      'done': 0,
+      'skipped': 0,
+      'fetch_error': 0,
+      'parse_error': 0,
+    }
+
+  def get_stats(self):
+    from copy import deepcopy
+    return deepcopy(self._stats)
+
+  def log_stats(self, key):
+    if key in self._stats:
+      with self._stats_lock:
+        self._stats[key] += 1
+    else:
+      raise Exception('Unknown key: %s' % key)
 
   def put_url(self, url):
     with self._url_cache_lock:
@@ -62,7 +86,9 @@ class Queue(_Queue):
     if (not callable(cb)): return False
 
     # check param `url`
-    if not self.put_url(url): return False
+    if not self.put_url(url):
+      self.log_stats('skipped')
+      return False
 
     # fill-in other params
     if (category is None): category = 'unknown'
@@ -89,21 +115,34 @@ class Worker(Thread):
     self.db = DB()
 
   def run(self):
-    from . import fetch
+    import traceback
     from time import sleep
+
+    from lib import fetch
 
     sleep(1)
 
     while True:
-      try: payload = self.pool.get(False, 6)
+      try: payload = self.pool.get(False, 9)
       except Empty: break
 
       try:
-        payload = fetch(payload)
+        payload = fetch(payload, db = self.db)
+      except:
+        print("\n***\nFetch Error")
+        traceback.print_exc()
+        self.pool.log_stats('fetch_error')
+        self.pool.task_done()
+        continue
+
+      try:
         payload['cb'](payload, db = self.db, pool = self.pool)
       except:
-        import traceback
         print("\n***\nParse Error")
         traceback.print_exc()
-      finally:
+        self.pool.log_stats('parse_error')
         self.pool.task_done()
+        continue
+
+      self.pool.log_stats('done')
+      self.pool.task_done()

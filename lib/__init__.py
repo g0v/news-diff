@@ -18,13 +18,10 @@ from ctlr_base import Ctlr_Base
 from ctlr_base_rss_2_0 import Ctlr_Base_RSS_2_0
 from proc import Queue
 
+import util
+
 # logging
 _format = '%(classname)-35s %(levelname)s %(message)s'
 logging.basicConfig(format=_format)
 logger = logging.getLogger('news-diff')
 logger.setLevel(logging.WARNING)
-
-# Util
-def md5(unicode_str):
-  from hashlib import md5
-  return md5(unicode_str).hexdigest()

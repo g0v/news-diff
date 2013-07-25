@@ -84,19 +84,35 @@ class Ctlr_Base:
 
     """
     import lxml.html
-    from . import md5
+    from lib import logger
 
-    try:
-      payload['pub_ts'] = Ctlr_Base.to_timestamp(payload['meta']['pub_date'])
+    try: payload['pub_ts'] = Ctlr_Base.to_timestamp(payload['meta']['pub_date'])
     except KeyError: pass
 
-    # Keep in meta so it's passed to content.meta
-    # payload['feed_url'] = payload['meta']['feed_url']
-    #
-    # Don't keep it, track feed_id instead
+    # dom tree 前處理
+    try:
+      html = lxml.html.fromstring(payload['response'])
+    except:
+      extra = {'classname': self.__class__}
+      logger.warning("HTML parse error, url: %s", payload['url_read'], extra=extra)
+      logger.warning("Got: %s", payload['response'], extra=extra)
+      return
+
+    # canonical url
+    url_canonical = html.cssselect('link[rel=canonical]')
+    payload['url_canonical'] = url_canonical[0].attrib['href'] \
+      if len(url_canonical) > 0 else payload['url_read']
+
+    # 移除 charset 因為保證是 unicode
+    tags = html.cssselect('meta[http-equiv=Content-Type]')
+    if (len(tags) > 0):
+      payload['meta']['Content-Type'] = tags[0].attrib['content']
+      for x in tags: x.drop_tree()
+
+    payload['html'] = html
+
     self.move_out_of_meta(payload, 'feed_url')
 
-    payload['html'] = lxml.html.fromstring(payload['response'])
     article = self.parse_response(payload)
 
     if article:
@@ -112,13 +128,7 @@ class Ctlr_Base:
     # html post-process
     from lxml.html import tostring, fromstring
     from bs4 import BeautifulSoup
-    from net import normalize_url
-
-    #update article url with canonical url
-    url_canonical = fromstring(article['response']).cssselect('link[rel=canonical]')
-
-    article['url_canonical'] = url_canonical[0].attrib['href'] \
-      if len(url_canonical) > 0 else article['url_read']
+    from lib.util import normalize_url
 
     #remove unwanted tags
     self.css_sel_drop_tree(article['content'], ['script'])
@@ -126,18 +136,18 @@ class Ctlr_Base:
     #prettify html with BeautifulSoup
     article['content'] = BeautifulSoup(tostring(article['content'])).body.next
 
-    article['text'] = self.pack_string(article['content'].text.encode('utf-8'))
-    article['html'] = self.pack_string(unicode(article['content']).encode('utf-8'))
+    article['text'] = self.pack_string(article['content'].text)
+    article['html'] = self.pack_string(unicode(article['content']))
     article["ctlr_classname"] = str(self.__class__)
 
     article['url'] = normalize_url(article['url'])
     article['url_read'] = normalize_url(article['url_read'])
     article['url_canonical'] = normalize_url(article['url_canonical'])
 
-    Ctlr_Base.move_out_of_meta(article, 'title')
-
     del article['response']
     del article['content']
+
+    self.move_out_of_meta(article, 'title')
 
     return article
 
@@ -188,6 +198,7 @@ class Ctlr_Base:
 
   @staticmethod
   def pack_string(input):
+    """去除字串中對人閱讀無用的字符"""
     import re
     output = re.sub('\r', '\n', input)
     output = re.sub('\n+', '\n', output)
@@ -199,7 +210,8 @@ class Ctlr_Base:
   # ==============================
 
   @staticmethod
-  def css_sel_drop_tree(element, selector_list):
+  def css_sel_drop_tree(dom_tree, selector_list):
     """for lxml Elements"""
-    for x in element.cssselect(", ".join(selector_list)):
+    for x in dom_tree.cssselect(", ".join(selector_list)):
       x.drop_tree()
+

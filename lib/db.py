@@ -76,7 +76,11 @@ class DB_Base:
     from MySQLdb.cursors import SSCursor
 
     cursor = self.cursor(cursorclass=SSCursor)
-    cursor.execute(sql)
+
+    try: cursor.execute(sql)
+    except ProgrammingError as e:
+      print(cursor._last_executed)
+      raise e
 
     buff = []
     while True:
@@ -216,8 +220,8 @@ class DB_Data(DB_Meta):
   #
   def save_hashtbl(self, tbl_name, data):
     """將 data 存入列表，可以是 body, [body...] 或 [{'body':'body'}...] 的格式"""
-    from . import md5
     from MySQLdb import escape_string
+    from lib.util import md5
 
     if (type(data) is str):
       _data = {'md5': md5(data), 'body': data}
@@ -239,7 +243,8 @@ class DB_Data(DB_Meta):
     """更新新聞內容"""
     from json import dumps
     from datetime import datetime
-    from . import md5
+
+    from lib.util import md5
 
     # deep copy so that we don't mess up the original payload
     _payload = deepcopy(payload)
@@ -292,7 +297,8 @@ class DB_Data(DB_Meta):
   def save_response(self, payload):
     from json import dumps
     from datetime import datetime
-    from . import md5
+
+    from lib.util import md5
 
     # deep copy so that we don't mess up the original payload
     _payload = deepcopy(payload)
@@ -330,8 +336,9 @@ class DB(DB_Data):
   def get_fresh_urls(self, urls):
     """篩選出 urls 中未曾成功抓取過者並回傳"""
 
-    from . import md5
-    from net import normalize_url
+    from lib.util import md5, normalize_url
+
+    if (len(urls) == 0): return set()
 
     url_md5 = [{'url': x, 'md5': md5(normalize_url(x))} for x in urls]
     hashes = "(" + (",".join(["UNHEX('%s')" % x['md5'] for x in url_md5 ])) + ")"
