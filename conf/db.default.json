@@ -1,7 +1,7 @@
 {
     "default": {
         "driver": "mysql",
-        "db"  : "news",
+        "db"  : "news_production",
         "host": "127.0.0.1",
         "user": "db_user",
         "passwd": "db_pass"

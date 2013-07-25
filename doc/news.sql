@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- 主機: localhost
--- 產生日期: 2013 年 07 月 24 日 18:55
+-- 產生日期: 2013 年 07 月 25 日 17:45
 -- 伺服器版本: 5.6.12-rc60.4
 -- PHP 版本: 5.4.9-4ubuntu2.2
 
@@ -17,10 +17,10 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8 */;
 
 --
--- 資料庫: `news_develop`
+-- 資料庫: `news_production`
 --
-CREATE DATABASE IF NOT EXISTS `news_develop` DEFAULT CHARACTER SET utf8 COLLATE utf8_bin;
-USE `news_develop`;
+CREATE DATABASE IF NOT EXISTS `news_production` DEFAULT CHARACTER SET utf8 COLLATE utf8_bin;
+USE `news_production`;
 
 -- --------------------------------------------------------
 
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `articles` (
   `text_hash` binary(16) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `url_canonical_hash_2` (`url_canonical_hash`,`text_hash`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1856 ;
 
 -- --------------------------------------------------------
 
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS `ctlrs` (
   PRIMARY KEY (`ctlr_id`),
   UNIQUE KEY `classname` (`classname`),
   UNIQUE KEY `ctlr_id` (`ctlr_id`,`created_on`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=9 ;
 
 -- --------------------------------------------------------
 
@@ -131,12 +131,12 @@ CREATE TABLE IF NOT EXISTS `ctlr_feed` (
 CREATE TABLE IF NOT EXISTS `feeds` (
   `feed_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
   `host_id` mediumint(8) unsigned DEFAULT NULL,
-  `url` varchar(256) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `url` varchar(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `title` varchar(32) COLLATE utf8_bin NOT NULL DEFAULT '',
   PRIMARY KEY (`feed_id`),
   UNIQUE KEY `url` (`url`),
   KEY `host_id` (`host_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=50 ;
 
 -- --------------------------------------------------------
 
@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS `feeds` (
 
 CREATE TABLE IF NOT EXISTS `fetches` (
   `created_on` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `url` varchar(256) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `url` varchar(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `category` enum('unknown','error','response','revisit','rss_2_0') COLLATE utf8_bin NOT NULL DEFAULT 'unknown',
   `response` longtext COLLATE utf8_bin NOT NULL,
   UNIQUE KEY `category` (`category`,`url`,`created_on`)
@@ -161,11 +161,11 @@ CREATE TABLE IF NOT EXISTS `fetches` (
 CREATE TABLE IF NOT EXISTS `hosts` (
   `host_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(64) COLLATE utf8_bin NOT NULL,
-  `url` varchar(256) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `url` varchar(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   PRIMARY KEY (`host_id`),
   UNIQUE KEY `url` (`url`),
   KEY `name` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=8 ;
 
 -- --------------------------------------------------------
 
@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS `hosts` (
 CREATE TABLE IF NOT EXISTS `responses` (
   `last_seen_on` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `feed_id` mediumint(8) unsigned DEFAULT NULL,
-  `url` varchar(256) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `url` varchar(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `body` mediumtext COLLATE utf8_bin NOT NULL,
   `body_hash` binary(16) NOT NULL,
   `meta` text COLLATE utf8_bin NOT NULL,
