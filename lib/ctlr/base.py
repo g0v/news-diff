@@ -64,7 +64,7 @@ class Ctlr_Base:
     處理 fetcher 傳回之資料，調用 parse_response 解析其內容並儲存。
 
     輸入 payload 格式為 {
-      'response': 'RESPONSE_BODY',
+      'src': 'RESPONSE_BODY',
       'meta': {
         'feed_url': '',
         'pub_date': 'str'
@@ -79,17 +79,19 @@ class Ctlr_Base:
     import lxml.html
     from lib import logger, util, db
     from lib.util.dt import to_timestamp
+    from lib.util.text import to_unicode
 
     try: payload['pub_ts'] = to_timestamp(payload['meta']['pub_date'])
     except KeyError: pass
 
     # dom tree 前處理
     try:
-      html = lxml.html.fromstring(payload['response'])
+      html = lxml.html.fromstring(payload['src']) # lxml handles html encoding
+      payload['src'] = to_unicode(payload['src']) # conver to unicode before storing
     except:
       extra = {'classname': self.__class__}
       logger.warning("HTML parse error, url: %s", payload['url_read'], extra=extra)
-      logger.warning("Got: %s", payload['response'], extra=extra)
+      logger.warning("Got: %s", payload['src'], extra=extra)
       pool.log_stats('error_parse')
       return
 
@@ -132,18 +134,15 @@ class Ctlr_Base:
     self.css_sel_drop_tree(article['content'], ['script'])
 
     #prettify html with BeautifulSoup
-    article['content'] = BeautifulSoup(tostring(article['content'], encoding=unicode)).body.next
+    html_bs4 = BeautifulSoup(tostring(article['content'], encoding=unicode)).body.next
 
-    article['text'] = pack_string(article['content'].text)
-    article['html'] = pack_string(unicode(article['content']))
+    article['text'] = pack_string(html_bs4.text)
+    article['html'] = pack_string(unicode(html_bs4))
     article["ctlr_classname"] = str(self.__class__)
 
     article['url'] = normalize_url(article['url'])
     article['url_read'] = normalize_url(article['url_read'])
     article['url_canonical'] = normalize_url(article['url_canonical'])
-
-    del article['response']
-    del article['content']
 
     self.move_out_of_meta(article, 'title')
 

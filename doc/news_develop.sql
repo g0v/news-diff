@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- 主機: localhost
--- 產生日期: 2013 年 07 月 25 日 17:45
+-- 產生日期: 2013 年 07 月 30 日 18:12
 -- 伺服器版本: 5.6.12-rc60.4
 -- PHP 版本: 5.4.9-4ubuntu2.2
 
@@ -17,10 +17,10 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8 */;
 
 --
--- 資料庫: `news_production`
+-- 資料庫: `news_develop`
 --
-CREATE DATABASE IF NOT EXISTS `news_production` DEFAULT CHARACTER SET utf8 COLLATE utf8_bin;
-USE `news_production`;
+CREATE DATABASE IF NOT EXISTS `news_develop` DEFAULT CHARACTER SET utf8 COLLATE utf8_bin;
+USE `news_develop`;
 
 -- --------------------------------------------------------
 
@@ -42,9 +42,18 @@ CREATE TABLE IF NOT EXISTS `articles` (
   `meta_hash` binary(16) NOT NULL,
   `html_hash` binary(16) NOT NULL,
   `text_hash` binary(16) NOT NULL,
+  `src_hash` binary(16) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `url_canonical_hash_2` (`url_canonical_hash`,`text_hash`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1856 ;
+  UNIQUE KEY `url_canonical_hash` (`url_canonical_hash`,`text_hash`),
+  KEY `feed_id` (`feed_id`),
+  KEY `ctlr_id` (`ctlr_id`),
+  KEY `url_hash` (`url_hash`),
+  KEY `url_read_hash` (`url_read_hash`),
+  KEY `meta_hash` (`meta_hash`),
+  KEY `html_hash` (`html_hash`),
+  KEY `text_hash` (`text_hash`)
+  KEY `src_hash` (`src_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
 
@@ -54,7 +63,7 @@ CREATE TABLE IF NOT EXISTS `articles` (
 
 CREATE TABLE IF NOT EXISTS `article__htmls` (
   `hash` binary(16) NOT NULL,
-  `body` mediumtext COLLATE utf8_bin NOT NULL,
+  `body` mediumblob NOT NULL,
   PRIMARY KEY (`hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
@@ -67,6 +76,18 @@ CREATE TABLE IF NOT EXISTS `article__htmls` (
 CREATE TABLE IF NOT EXISTS `article__meta` (
   `hash` binary(16) NOT NULL,
   `body` text COLLATE utf8_bin NOT NULL,
+  PRIMARY KEY (`hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+
+-- --------------------------------------------------------
+
+--
+-- 表的結構 `article__srcs`
+--
+
+CREATE TABLE IF NOT EXISTS `article__srcs` (
+  `hash` binary(16) NOT NULL,
+  `body` mediumblob NOT NULL,
   PRIMARY KEY (`hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
@@ -107,7 +128,7 @@ CREATE TABLE IF NOT EXISTS `ctlrs` (
   PRIMARY KEY (`ctlr_id`),
   UNIQUE KEY `classname` (`classname`),
   UNIQUE KEY `ctlr_id` (`ctlr_id`,`created_on`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=9 ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
 
@@ -136,7 +157,7 @@ CREATE TABLE IF NOT EXISTS `feeds` (
   PRIMARY KEY (`feed_id`),
   UNIQUE KEY `url` (`url`),
   KEY `host_id` (`host_id`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=50 ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
 
@@ -148,7 +169,7 @@ CREATE TABLE IF NOT EXISTS `fetches` (
   `created_on` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `url` varchar(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `category` enum('unknown','error','response','revisit','rss_2_0') COLLATE utf8_bin NOT NULL DEFAULT 'unknown',
-  `response` longtext COLLATE utf8_bin NOT NULL,
+  `src` mediumtext COLLATE utf8_bin NOT NULL,
   UNIQUE KEY `category` (`category`,`url`,`created_on`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
@@ -165,7 +186,7 @@ CREATE TABLE IF NOT EXISTS `hosts` (
   PRIMARY KEY (`host_id`),
   UNIQUE KEY `url` (`url`),
   KEY `name` (`name`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=8 ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
 
@@ -177,11 +198,48 @@ CREATE TABLE IF NOT EXISTS `responses` (
   `last_seen_on` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `feed_id` mediumint(8) unsigned DEFAULT NULL,
   `url` varchar(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  `body` mediumtext COLLATE utf8_bin NOT NULL,
-  `body_hash` binary(16) NOT NULL,
+  `src` mediumtext COLLATE utf8_bin NOT NULL,
+  `src_hash` binary(16) NOT NULL,
   `meta` text COLLATE utf8_bin NOT NULL,
-  UNIQUE KEY `url` (`url`,`body_hash`)
+  UNIQUE KEY `url` (`url`,`src_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin COMMENT='抓取到的文章原文；若內容變動則寫入新列，否則僅修改原列之值';
+
+-- --------------------------------------------------------
+
+--
+-- 替換 view以便查看 `view_articles`
+--
+CREATE TABLE IF NOT EXISTS `view_articles` (
+`id` bigint(20) unsigned
+,`title` varchar(512)
+,`pub_ts` timestamp
+,`created_on` timestamp
+,`last_seen_on` timestamp
+,`feed_id` mediumint(8) unsigned
+,`ctlr_id` mediumint(8) unsigned
+,`url_hash` binary(16)
+,`url` varchar(512)
+,`url_read_hash` binary(16)
+,`url_read` varchar(512)
+,`url_canonical_hash` binary(16)
+,`url_canonical` varchar(512)
+,`meta_hash` binary(16)
+,`meta` text
+,`html_hash` binary(16)
+,`html` longtext
+,`text_hash` binary(16)
+,`text` mediumtext
+,`src_hash` binary(16)
+,`src` longtext
+);
+-- --------------------------------------------------------
+
+--
+-- view結構 `view_articles`
+--
+DROP TABLE IF EXISTS `view_articles`;
+
+CREATE ALGORITHM=MERGE DEFINER=`_news`@`localhost` SQL SECURITY DEFINER VIEW `view_articles` AS select `a`.`id` AS `id`,`a`.`title` AS `title`,`a`.`pub_ts` AS `pub_ts`,`a`.`created_on` AS `created_on`,`a`.`last_seen_on` AS `last_seen_on`,`a`.`feed_id` AS `feed_id`,`a`.`ctlr_id` AS `ctlr_id`,`a`.`url_hash` AS `url_hash`,`au`.`body` AS `url`,`a`.`url_read_hash` AS `url_read_hash`,`aur`.`body` AS `url_read`,`a`.`url_canonical_hash` AS `url_canonical_hash`,`auc`.`body` AS `url_canonical`,`a`.`meta_hash` AS `meta_hash`,`am`.`body` AS `meta`,`a`.`html_hash` AS `html_hash`,convert(uncompress(`ah`.`body`) using utf8) AS `html`,`a`.`text_hash` AS `text_hash`,`at`.`body` AS `text`,`a`.`src_hash` AS `src_hash`,convert(uncompress(`as`.`body`) using utf8) AS `src` from (((((((`articles` `a` left join `article__texts` `at` on((`a`.`text_hash` = `at`.`hash`))) left join `article__htmls` `ah` on((`a`.`html_hash` = `ah`.`hash`))) left join `article__meta` `am` on((`a`.`meta_hash` = `am`.`hash`))) left join `article__srcs` `as` on((`a`.`src_hash` = `as`.`hash`))) left join `article__urls` `au` on((`a`.`url_hash` = `au`.`hash`))) left join `article__urls` `aur` on((`a`.`url_read_hash` = `aur`.`hash`))) left join `article__urls` `auc` on((`a`.`url_canonical_hash` = `auc`.`hash`)));
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

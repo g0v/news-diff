@@ -32,14 +32,14 @@ def _break_portal_feedsportal(payload, uo):
   try:
     html = fromstring(text)
     payload['url_read'] = html.cssselect('a')[0].attrib['href']
-    payload['response'] = urllib.urlopen(payload['url_read'])
+    payload['src'] = urllib.urlopen(payload['url_read'])
   except:
     payload['url_read'] = uo.url
-    payload['response'] = text
+    payload['src'] = text
 
 def fetch(payload, dbi = None):
   """抓取 payload['url'] 的檔案
-  並將最終讀取到的 url 寫入 payload['url_read'], response 寫入 payload['response']
+  並將最終讀取到的 url 寫入 payload['url_read'], response 寫入 payload['src']
   """
   import re
   from lxml.html import fromstring
@@ -53,11 +53,11 @@ def fetch(payload, dbi = None):
     if portal:
       break_portal(portal, payload, uo)
     else:
-      payload['response'] = uo.read()
+      payload['src'] = uo.read()
       payload['url_read'] = uo.url
 
   except Exception as e:
-    payload['response'] = 'error ' + unicode(e)
+    payload['src'] = 'error ' + unicode(e)
     payload['category'] = 'error'
     payload['exception'] = e
 
@@ -68,7 +68,7 @@ def fetch(payload, dbi = None):
   if dbi is None: _dbi = DB()
   else: _dbi = dbi
 
-  db.save_fetch(payload['url'], to_unicode(payload['response']), payload['category'], dbi = _dbi)
+  db.save_fetch(payload['url'], to_unicode(payload['src']), payload['category'], dbi = _dbi)
   if dbi is None: _dbi.disconnect()
 
   if 'error' == payload['category']:

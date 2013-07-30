@@ -16,12 +16,14 @@ from threading import Condition
 import lib
 
 jobs = lib.Queue()
-db = lib.DB()
+dbi = lib.DB()
 
-lib.proc.feed_fetch(jobs, ctlr_list, db)
-lib.proc.feed_revisit(jobs, db)
+lib.proc.cleanup(dbi)
 
-db.disconnect()
+lib.proc.feed_fetch(jobs, ctlr_list, dbi)
+lib.proc.feed_revisit(jobs, dbi)
+
+dbi.disconnect()
 
 # initiate worker threads
 for i in xrange(lib.conf['config']['threads']):

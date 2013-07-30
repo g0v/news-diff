@@ -3,7 +3,7 @@
 from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
-  _created_on = '2013-07-25T16:33:26'
+  _created_on = '2013-07-25T16:33:26 UTC'
   _my_feeds = [
     {"title": "焦點新聞", "url": "http://www.libertytimes.com.tw/rss/fo.xml"},
     {"title": "政治新聞", "url": "http://www.libertytimes.com.tw/rss/p.xml"},

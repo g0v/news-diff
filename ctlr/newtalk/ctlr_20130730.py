@@ -3,7 +3,7 @@
 from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
-  _created_on = '2013-07-25T16:33:26'
+  _created_on = '2013-07-30T23:30:00 UTC'
 
   _my_feeds = [
     {"title": "要聞", "url": "http://newtalk.tw/rss_news.php"},
@@ -20,16 +20,23 @@ class Ctlr(Ctlr_Base_RSS_2_0):
   ]
 
   def parse_response(self, payload):
-    content = payload['html'].cssselect('#content')
+    from lxml.html import fromstring, tostring
+    sel_list = [
+        '#content .news_ctxt_area_rt1 .news_ctxt_area_pic',
+        '#content .news_ctxt_area_rt1 .news_ctxt_area_word_13pt',
+    ]
+    _hits = payload['html'].cssselect(", ".join(sel_list))
 
-    if content is None or len(content) == 0: return None
-    content = content[0]
+    if len(_hits) not in (0,2): return False
 
-    self.css_sel_drop_tree(content, [
-        '.cont_green_tit', '.cgt_bg_1', '.news_cont_area_top',
-        '.news_cont_area_tit_space', '.news_cont_talker_write',
-        '#_relay_reply', "#fb-root", '.fb_comments'
-      ])
+    sel_list = [
+        '#content .news_cont_area_tit',
+        '#content .news_ctxt_area_lt1 .news_ctxt_area_word',
+    ]
+    hits = payload['html'].cssselect(", ".join(sel_list))
 
-    payload['content'] = content
+    if hits is None or len(hits) != len(sel_list): return False
+    hits[1:1] = _hits
+
+    payload['content'] = fromstring('\n'.join([tostring(x, encoding=unicode) for x in hits]))
     return payload

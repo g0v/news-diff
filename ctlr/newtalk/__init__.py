@@ -8,5 +8,5 @@ host = {
   "url": "http://newtalk.tw/",
 }
 
-import ctlr_20130726
-Ctlrs = [ctlr_20130726.Ctlr]
+import ctlr_20130730
+Ctlrs = [ctlr_20130730.Ctlr]

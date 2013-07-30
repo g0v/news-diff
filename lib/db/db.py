@@ -48,7 +48,7 @@ class DB:
     return conn.cursor()
 
   @staticmethod
-  def execute(sql, data, dbi = None):
+  def execute(sql, data = None, dbi = None):
 
     if dbi is None: _dbi = DB()
     else: _dbi = dbi
@@ -57,14 +57,17 @@ class DB:
     cursor = _dbi.cursor()
 
     try:
-      if type(data) is dict: cursor.execute(sql, data)
+      if data is None: cursor.execute(sql)
+      elif type(data) is dict: cursor.execute(sql, data)
       else: cursor.executemany(sql, data)
     except Exception as e:
-      try :cursor._last_executed
-      except AttributeError: raise e
-
       print('query error: ')
-      print(cursor._last_executed)
+
+      try:
+        print(cursor._last_executed)
+      except AttributeError:
+        import traceback
+        traceback.print_exc()
 
     conn.commit()
     cursor.close()
