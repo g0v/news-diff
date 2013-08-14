@@ -72,6 +72,7 @@ def fetch(payload, dbi = None):
   if dbi is None: _dbi.disconnect()
 
   if 'error' == payload['category']:
+    logger.warning("failed fetching %s", payload['url'],  extra={'classname':self.__class__})
     raise payload['exception']
 
   return payload
