@@ -1,4 +1,4 @@
-# -*- encoding:utf-8 -*-
+# -*- coding:utf-8 -*-
 #
 # 管理下列目標資料：
 #   - fetch

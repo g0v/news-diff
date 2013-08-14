@@ -1,4 +1,4 @@
-# -*- encoding:utf-8 -*-
+# -*- coding:utf-8 -*-
 #
 # 提供各類列表功能
 #

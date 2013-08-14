@@ -1,4 +1,4 @@
-# -*-encoding:utf-8 -*-
+# -*-coding:utf-8 -*-
 #
 # 資料庫相關功能
 # 每個 thread 需生成自身的 db instance；快取與一致性問題由資料庫處理

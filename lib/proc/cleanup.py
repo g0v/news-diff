@@ -1,4 +1,4 @@
-# -*- encoding: utf8 -*-
+# -*- coding: utf-8 -*-
 
 def cleanup(dbi = None):
   from lib import DB

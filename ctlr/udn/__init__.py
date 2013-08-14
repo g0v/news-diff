@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # http://udn.com/rss/index.html?new
 #

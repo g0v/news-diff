@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
