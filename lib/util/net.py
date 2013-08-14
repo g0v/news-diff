@@ -22,7 +22,7 @@ def break_portal(portal, payload, uo):
       return _break_portal_feedsportal(payload, uo)
   except Exception:
     import traceback
-    print('\n***\nBreak Portal Failed (%s, %s) ***' % (portal, payload['url']))
+    print('\n***\nFailed breaking portal (%s, %s) ***' % (portal, payload['url']))
     traceback.print_exc()
 
 def _break_portal_feedsportal(payload, uo):
@@ -52,7 +52,7 @@ def fetch(payload, dbi = None):
   try:
     uo = urllib.urlopen(payload['url'])
     if (uo.code != 200):
-      raise("HTTP response code=%d from %s" % (uo.code, uo.url))
+      raise IOError("HTTP response code=%d from %s" % (uo.code, uo.url))
 
     portal = get_portal(uo.url)
     if portal:
