@@ -55,23 +55,29 @@ def fetch(payload, dbi = None):
     else:
       payload['src'] = uo.read()
       payload['url_read'] = uo.url
-
   except Exception as e:
+    # 抓取出錯，留待記錄 (save_fetch)
     payload['src'] = 'error ' + unicode(e)
     payload['category'] = 'error'
     payload['exception'] = e
-
 
   if 'url_read' not in payload:
     payload['url_read'] = payload['url']
 
   if dbi is None: _dbi = DB()
   else: _dbi = dbi
-
-  db.save_fetch(payload['url'], to_unicode(payload['src']), payload['category'], dbi = _dbi)
+  
+  try:
+    db.save_fetch(payload['url'], to_unicode(payload['src']), payload['category'], dbi = _dbi)
+  except Exception as e:
+    extra = {'classname', 'util.net.fetch()'}
+    logger.warning('DB save_fetch failed for url %s', payload['url'], extra=extra)
+    logger.debug(e)
+  
   if dbi is None: _dbi.disconnect()
 
   if 'error' == payload['category']:
+    # raise the exception to skip the parsing process
     logger.warning("failed fetching %s", payload['url'],  extra={'classname':self.__class__})
     raise payload['exception']
 
