@@ -31,10 +31,15 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
     from lib import db, logger
 
     Ctlr_Base.feed(self, pool, dbi)
+    extra={'classname': self.__class__}
 
     for rss in self._my_feeds:
       if ('title' not in rss):
         rss['title'] = None
+      
+      if not ('url' in rss and rss['url']):
+        logger.warning('Bad rss host url for %s(%s)', rss['title'], rss.get('url', None), extra=extra)
+        continue
 
       if ('host_url' not in rss):
         rss['host_url'] = self.get_host()['url']
@@ -45,7 +50,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
         'classname': str(self.__class__)
       }, dbi = dbi)
 
-      logger.info('%s queued', rss['url'], extra={'classname': self.__class__})
+      logger.info('%s queued', rss['url'], extra=extra)
 
       pool.put(rss['url'], self.dispatch_rss_2_0, category = self._parser['format'])
 
