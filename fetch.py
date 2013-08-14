@@ -5,6 +5,7 @@
 ctlr_list = [
   'appledaily',
   'chinatimes',
+  'cna',
   'coolloud',
   'e_info_org_tw',
   'libertytimes',
