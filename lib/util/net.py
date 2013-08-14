@@ -44,11 +44,16 @@ def fetch(payload, dbi = None):
   import re
   from lxml.html import fromstring
 
-  from lib import db, DB
+  from lib import db, DB, logger
   from lib.util.text import to_unicode
+
+  extra = {'classname': 'util.net.fetch()'}
 
   try:
     uo = urllib.urlopen(payload['url'])
+    if (uo.code != 200):
+      raise("HTTP response code=%d from %s" % (uo.code, uo.url))
+
     portal = get_portal(uo.url)
     if portal:
       break_portal(portal, payload, uo)
@@ -70,15 +75,14 @@ def fetch(payload, dbi = None):
   try:
     db.save_fetch(payload['url'], to_unicode(payload['src']), payload['category'], dbi = _dbi)
   except Exception as e:
-    extra = {'classname', 'util.net.fetch()'}
-    logger.warning('DB save_fetch failed for url %s', payload['url'], extra=extra)
+    logger.warning('DB save_fetch failed for url %s' % payload['url'], extra=extra)
     logger.debug(e)
   
   if dbi is None: _dbi.disconnect()
 
   if 'error' == payload['category']:
     # raise the exception to skip the parsing process
-    logger.warning("failed fetching %s", payload['url'],  extra={'classname':self.__class__})
+    logger.warning("failed fetching %s" % payload['url'], extra=extra)
     raise payload['exception']
 
   return payload

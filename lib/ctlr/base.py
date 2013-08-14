@@ -91,7 +91,7 @@ class Ctlr_Base:
     except:
       extra = {'classname': self.__class__}
       logger.warning("HTML parse error, url: %s", payload['url_read'], extra=extra)
-      logger.warning("Got: %s", payload['src'], extra=extra)
+      logger.info("Got: %s", payload['src'], extra=extra)
       pool.log_stats('error_parse')
       return
 

@@ -43,7 +43,8 @@ def feed_revisit(pool, dbi = None):
   # logger.info("Found %d articles to revisit" % len(revisit_list))
 
   for x in db.list_recent_fetches(revisit_max_m(), dbi = dbi):
-    if (not need_revisit(x[i_created_on], x[i_last_seen_on])):
+    expired = need_revisit(x[i_created_on], x[i_last_seen_on])
+    if (not expired):
       continue
 
     if (x[i_ctlr] not in ctlr_cache):
@@ -58,7 +59,7 @@ def feed_revisit(pool, dbi = None):
     meta['pub_date'] = to_timestamp(x[i_pub_ts])
     meta['title'] = x[i_title]
 
-    logger.info('Revisiting %s', x[i_canonical_url], extra = {'classname': feed_revisit})
+    logger.info('Revisiting %s, expired for %d min', x[i_canonical_url], expired, extra = {'classname': feed_revisit})
     pool.log_stats('with_revisit')
     pool.put("http://" + x[i_canonical_url], ctlr.dispatch_response, category="revisit", meta = meta)
 
@@ -79,8 +80,13 @@ def need_revisit(created_on, last_seen_on):
   tmp = filter(lambda(x): x > article_age, _revisit_tbl.keys())
 
   if (len(tmp) == 0):
-    #expired, should be filtered by DB
+    # expired, should have been filtered by DB
     return False
 
   interval = _revisit_tbl[min(tmp)]
-  return visit_age >= interval
+  expired = visit_age - interval
+
+  if expired > 0:
+    return expired
+
+  return False
