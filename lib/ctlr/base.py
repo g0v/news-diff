@@ -100,7 +100,7 @@ class Ctlr_Base:
     payload['url_canonical'] = url_canonical[0].attrib['href'] \
       if len(url_canonical) > 0 else payload['url_read']
 
-    # 移除 charset 因為保證是 unicode
+    # 移除 charset 因為保證是 unicode; 若未移除反而可能使 html parser 誤判
     tags = html.cssselect('meta[http-equiv=Content-Type]')
     if (len(tags) > 0):
       payload['meta']['Content-Type'] = tags[0].attrib['content']
@@ -118,6 +118,7 @@ class Ctlr_Base:
       db.save_article(article, dbi = dbi)
       pool.log_stats('done_article')
     else:
+      # TODO: 還是寫入 article 表
       db.save_response(payload, dbi = dbi)
       pool.log_stats('error_parse')
 
@@ -130,10 +131,15 @@ class Ctlr_Base:
     from lib.util.net import normalize_url
     from lib.util.text import pack_string
 
-    #remove unwanted tags
+    # article['content'] may be list of lxml doms
+    if type(article['content']) is list:
+      article['content'] = \
+        fromstring('\n'.join([tostring(x, encoding=unicode) for x in article['content']]))
+
+    # remove unwanted tags
     self.css_sel_drop_tree(article['content'], ['script'])
 
-    #prettify html with BeautifulSoup
+    # prettify html with BeautifulSoup
     html_bs4 = BeautifulSoup(tostring(article['content'], encoding=unicode)).body.next
 
     article['text'] = pack_string(html_bs4.text)

@@ -24,5 +24,5 @@ class Ctlr(Ctlr_Base_RSS_2_0):
     hits = payload['html'].cssselect('#story_title, #story_author, #story')
 
     if hits is None or len(hits) < 3: return None
-    payload['content'] = fromstring('\n'.join([tostring(x, encoding=unicode) for x in hits]))
+    payload['content'] = hits
     return payload

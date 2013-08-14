@@ -36,7 +36,7 @@ class Ctlr(Ctlr_Base_RSS_2_0):
     hits = payload['html'].cssselect(", ".join(sel_list))
 
     if hits is None or len(hits) != len(sel_list): return False
-    hits[1:1] = _hits
 
-    payload['content'] = fromstring('\n'.join([tostring(x, encoding=unicode) for x in hits]))
+    hits[1:1] = _hits
+    payload['content'] = hits
     return payload
