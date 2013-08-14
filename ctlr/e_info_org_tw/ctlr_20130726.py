@@ -16,5 +16,5 @@ class Ctlr(Ctlr_Base_RSS_2_0):
     )
 
     if hits is None or len(hits) < 2: return None
-    payload['content'] = fromstring('\n'.join([tostring(x, encoding=unicode) for x in hits]))
+    payload['content'] = hits
     return payload
