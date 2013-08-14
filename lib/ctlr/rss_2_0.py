@@ -69,7 +69,7 @@ class Ctlr_Base_RSS_2_0 (Ctlr_Base):
     try:
       dom = minidom.parseString(payload['src'])
     except:
-      logger.error('failed parsing %s', payload['url'], extra={'classname': self.__class__})
+      logger.warning('failed parsing %s', payload['url'], extra={'classname': self.__class__})
       pool.log_stats('error_parse')
       return
 
