@@ -65,13 +65,13 @@ def save_article(payload, dbi = None):
   _payload['src_md5'] = md5(_payload['src'])
 
 
-  _save_hashtbl_zip('article__htmls', {
+  _save_hashtbl('article__htmls', {
     'md5': _payload['html_md5'], 'body':_payload['html']}, dbi = dbi)
   _save_hashtbl('article__texts', {
     'md5': _payload['text_md5'], 'body':_payload['text']}, dbi = dbi)
   _save_hashtbl('article__meta', {
     'md5': _payload['meta_md5'], 'body': _payload['meta']}, dbi = dbi)
-  _save_hashtbl_zip('article__srcs', {
+  _save_hashtbl('article__srcs', {
     'md5': _payload['src_md5'], 'body': _payload['src']}, dbi = dbi)
 
   # hashtbl: url
@@ -125,26 +125,3 @@ def _save_hashtbl(tbl_name, data, dbi = None):
 
   DB.execute(sql, _data, dbi = dbi)
 
-def _save_hashtbl_zip(tbl_name, data, dbi = None):
-  """
-  將 data 壓縮並存入列表，接受 body, [body...] 或 [{'body':'body'}...] 的格式
-  數量可能很大，因此硬寫不快取
-  """
-  from MySQLdb import escape_string
-  from lib.util.text import md5
-
-  if (type(data) is str):
-    _data = {'md5': md5(data), 'body': data}
-  elif (type(data) is dict):
-    if 'md5' not in data:
-      data['md5'] = md5(data['body'])
-    _data = data
-  elif (type(data[0]) is str):
-    _data = [{'md5': md5(x), 'body': x} for x in data]
-  else:
-    _data = [{'md5': x['md5'] if 'md5' in x else md5(x['body']), 'body': x['body']} for x in data]
-
-  sql = "INSERT IGNORE INTO `%s` (`body`, `hash`) VALUES " % escape_string(tbl_name)
-  sql += "(COMPRESS(%(body)s), UNHEX(%(md5)s))"
-
-  DB.execute(sql, _data, dbi = dbi)
