@@ -3,7 +3,7 @@
 from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
-  _created_on = '2013-07-25T16:33:26 UTC'
+  _created_on = '2013-07-25T16:33:26Z'
 
   _my_feeds = [
     {"title": "國際焦點", "url": "http://udn.com/udnrss/international.xml"},
@@ -20,7 +20,6 @@ class Ctlr(Ctlr_Base_RSS_2_0):
   ]
 
   def parse_response(self, payload):
-    from lxml.html import fromstring, tostring
     hits = payload['html'].cssselect('#story_title, #story_author, #story')
 
     if hits is None or len(hits) < 3: return None

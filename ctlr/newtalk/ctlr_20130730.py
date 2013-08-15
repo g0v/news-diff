@@ -3,7 +3,7 @@
 from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
-  _created_on = '2013-07-30T23:30:00 UTC'
+  _created_on = '2013-07-30T23:30:00Z'
 
   _my_feeds = [
     {"title": "要聞", "url": "http://newtalk.tw/rss_news.php"},
@@ -20,13 +20,11 @@ class Ctlr(Ctlr_Base_RSS_2_0):
   ]
 
   def parse_response(self, payload):
-    from lxml.html import fromstring, tostring
     sel_list = [
         '#content .news_ctxt_area_rt1 .news_ctxt_area_pic',
         '#content .news_ctxt_area_rt1 .news_ctxt_area_word_13pt',
     ]
     _hits = payload['html'].cssselect(", ".join(sel_list))
-
     if len(_hits) not in (0,2): return False
 
     sel_list = [
@@ -34,7 +32,6 @@ class Ctlr(Ctlr_Base_RSS_2_0):
         '#content .news_ctxt_area_lt1 .news_ctxt_area_word',
     ]
     hits = payload['html'].cssselect(", ".join(sel_list))
-
     if hits is None or len(hits) != len(sel_list): return False
 
     hits[1:1] = _hits

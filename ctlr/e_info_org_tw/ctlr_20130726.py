@@ -3,14 +3,13 @@
 from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
-  _created_on = '2013-07-25T16:33:26 UTC'
+  _created_on = '2013-07-25T16:33:26Z'
 
   _my_feeds = [
     {"title": "全部文章", "url": "http://e-info.org.tw/rss.xml"},
   ]
 
   def parse_response(self, payload):
-    from lxml.html import fromstring, tostring
     hits = payload['html'].cssselect(
       '.maincol2-padding .title, .maincol2-padding #page'
     )

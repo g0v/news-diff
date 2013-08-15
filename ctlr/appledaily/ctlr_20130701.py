@@ -2,7 +2,7 @@
 from lib import Ctlr_Base_RSS_2_0
 
 class Ctlr(Ctlr_Base_RSS_2_0):
-  _created_on = '2013-07-25T16:33:26 UTC'
+  _created_on = '2013-07-25T16:33:26Z'
   _my_feeds = [
     {"title": "即時社會", "url": "http://www.appledaily.com.tw/rss/newcreate/kind/rnews/type/102"},
     {"title": "即時生活", "url": "http://www.appledaily.com.tw/rss/create/kind/rnews/type/105"},
