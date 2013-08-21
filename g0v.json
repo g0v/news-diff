@@ -1,0 +1,27 @@
+{
+  "author": "clifflu",
+  "status": "alpha",
+  "name": "news-diff",
+  "name_zh": "新聞監控",
+  "description": "A news crawler (framework) that revisit known entries for latest pages and detect modification.",
+  "description_zh": "新聞爬蟲，會重爬看過的連結以維持內容更新，並偵測內容變動。",
+  "document": "check /doc",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/g0v/news-diff"
+  },
+  "licenses": [
+    {"type": "MIT"}
+  ],
+  "keywords": [
+    "python",
+    "data",
+    "news",
+    "crawler"
+  ],
+  "audience": ["contrubutor"],
+  "products": ["data", "api"],
+  "projects": ["news-center"],
+  "contrubutors": ["clifflu", "radjan"],
+  "needs": ["programmer", "server", "consumer"]
+}
