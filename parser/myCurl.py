@@ -1,6 +1,7 @@
 import urllib
 import re
 from parallel_sync import wget
+from os.path import abspath, dirname, join
 #
 # parse html
 #
@@ -16,5 +17,6 @@ matches = re.findall('<a href="201602([^\"]+)">', myHTML, re.DOTALL)
 #
 prefix = 'http://ronnywang-newsdiff.s3-website-ap-northeast-1.amazonaws.com/2016/201602'
 downList = [ prefix + x  for x in matches]
-print downList
-wget.download('/home/pigu/git/newsdiffCurl/extract', downList, extract=True)
+#print(downList)
+targetPath = join(dirname(abspath(__file__)),'extract')
+wget.download(targetPath, downList, extract=True)
