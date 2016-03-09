@@ -3,3 +3,5 @@
 ._.DS_Store
 tmp
 conf/db.json
+/venv/
+/venv2/

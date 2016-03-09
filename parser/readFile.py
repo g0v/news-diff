@@ -66,7 +66,8 @@ class 轉編輯模式:
         網址變化 = []
         for 一篇新聞 in 新聞陣列:
             meta, _標題, _內容 = 一篇新聞
-            網址變化.append(meta['url'])
+            if len(網址變化) == 0 or meta['url'] != 網址變化[-1]:
+                網址變化.append(meta['url'])
         return 網址變化
 
     @classmethod
@@ -86,10 +87,11 @@ class 轉編輯模式:
         )
 
     @classmethod
-    def _產生檔案內容(cls, 網址變化, 上尾內容):
-        版 = "--->\n{0}\n\n\n{1}"
+    def _產生檔案內容(cls, 網址變化, 上尾標題, 上尾內容):
+        版 = "--->\n{0}\n\n\n{1}\n\n{2}"
         return 版.format(
             '\n'.join(['　　' + 網址 for 網址 in 網址變化]),
+            上尾標題,
             上尾內容
         )
 
@@ -108,7 +110,7 @@ class 轉編輯模式:
                         # 2. 第四個值是標題，多雙引號，怕到時有奇怪的符號，電腦會出錯
                     檔名 = cls._產生輸出檔名(頭一篇meta, 上尾標題, len(新聞陣列))
                     with open(join(目標資料夾, 檔名), 'w') as _輸出檔案:
-                        print(cls._產生檔案內容(網址變化, 上尾內容), file=_輸出檔案)
+                        print(cls._產生檔案內容(網址變化, 上尾標題, 上尾內容), file=_輸出檔案)
                 except:
                     print(編號)
                     raise
