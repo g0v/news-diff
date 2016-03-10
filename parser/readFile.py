@@ -48,7 +48,8 @@ class 轉編輯模式:
     @classmethod
     def 掃全部檔案(cls, 開始日期, 結束日期, 來源資料夾, 目標資料夾):
         新聞編號對應表 = {}
-        for 檔名 in listdir(來源資料夾):
+        for 檔名 in sorted(listdir(來源資料夾), key=lambda 名: 名[:-4]):
+            print(檔名)
             if 檔名.endswith('.txt'):
                 完整檔名 = join(來源資料夾, 檔名)
                 for 一篇新聞 in cls._parse(完整檔名):
